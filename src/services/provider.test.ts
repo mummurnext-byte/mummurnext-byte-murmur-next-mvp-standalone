@@ -14,7 +14,7 @@ describe("manual providers", () => {
       "makebestmusic_manual"
     ]);
     expect(getMusicProvider("missing").providerName).toBe("Suno");
-    expect(prompt.songTitle).toBe("Murmur Test - Quiet Confidence");
+    expect(prompt.songTitle).toBe("Mummur Test - Quiet Confidence");
     expect(prompt.songPrompt).toContain("Avoid artist names");
     expect(prompt.lyrics).toContain("[Chorus]");
   });
@@ -33,7 +33,7 @@ describe("manual providers", () => {
     expect(getVideoProvider("missing").providerName).toBe("HeyGen");
     expect(prompt.providerName).toBe("Akool");
     expect(prompt.lipSyncNotes).toContain("song.m4a");
-    expect(prompt.youtubeShortsDescription).toContain("#MurmurNext");
+    expect(prompt.youtubeShortsDescription).toContain("#MummurNext");
   });
 });
 
@@ -43,9 +43,9 @@ function contentPlanFixture() {
     digitalHumanId: "human-1",
     songIdeaId: "song-1",
     scheduledDate: new Date("2026-07-06T00:00:00.000Z"),
-    title: "Murmur Test - Quiet Confidence",
+    title: "Mummur Test - Quiet Confidence",
     caption: "Caption",
-    hashtags: ["#MurmurNext"],
+    hashtags: ["#MummurNext"],
     targetPlatform: "tiktok" as const,
     status: "idea" as const,
     createdAt: new Date("2026-07-06T00:00:00.000Z"),
@@ -53,7 +53,7 @@ function contentPlanFixture() {
     deletedAt: null,
     digitalHuman: {
       id: "human-1",
-      displayName: "Murmur Test",
+      displayName: "Mummur Test",
       legalName: null,
       avatarUrl: null,
       voiceSampleUrl: null,

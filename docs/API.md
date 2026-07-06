@@ -1,6 +1,6 @@
 # API and Actions
 
-Murmur Next MVP uses Server Actions for back-office mutations and one media route for playback.
+Mummur Next MVP uses Server Actions for back-office mutations and one media route for playback.
 
 ## Server Actions
 

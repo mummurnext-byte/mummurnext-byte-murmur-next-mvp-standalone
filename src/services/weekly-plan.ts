@@ -99,7 +99,7 @@ export function mockGenerateWeeklyPlan(digitalHuman: HumanWithPersona) {
       musicPrompt: `${digitalHuman.persona?.musicStyle ?? "modern pop"} song about ${theme}.`,
       title,
       caption: `${title}. Original AI music concept for short-form video.`,
-      hashtags: ["#MurmurNext", `#${tag}`, "#AIMusic"],
+      hashtags: ["#MummurNext", `#${tag}`, "#AIMusic"],
       targetPlatform: platform
     };
   });

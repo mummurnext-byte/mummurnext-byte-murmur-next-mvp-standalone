@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Murmur Next MVP",
+  title: "Mummur Next MVP",
   description: "Standalone AI digital-human music content system",
 };
 

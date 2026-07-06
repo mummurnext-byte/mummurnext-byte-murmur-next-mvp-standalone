@@ -49,7 +49,7 @@ export default async function Home({
     <main className="min-h-screen bg-zinc-950 p-6 text-zinc-100">
       <div className="mx-auto max-w-7xl space-y-6">
         <header>
-          <h1 className="text-3xl font-semibold">Murmur Next MVP</h1>
+          <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
           <p className="mt-2 max-w-3xl text-sm text-zinc-400">
             Standalone AI digital-human music content system. No Back Office modules, no real AI
             provider API calls, no cookies or tokens.

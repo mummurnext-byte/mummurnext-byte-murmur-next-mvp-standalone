@@ -4,7 +4,7 @@
 
 ### Added
 
-- Created standalone Murmur Next MVP project separated from Mummur Back Office.
+- Created standalone Mummur Next MVP project separated from Mummur Back Office.
 - Added Prisma schema and migration for Digital Humans, Personas, Consent Records, Song Ideas, Content Plans, Publish Assets, Platform Posts, and File Assets.
 - Added mock weekly plan generation.
 - Added manual Suno and MakeBestMusic music provider workflow.

@@ -1,8 +1,8 @@
-# Murmur Next MVP
+# Mummur Next MVP
 
 Standalone AI digital-human music content system.
 
-This repository is intentionally separate from Mummur Back Office. It contains only the Murmur Next MVP workflow:
+This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
 - Generate mock 7-day Content Plans.
@@ -39,7 +39,7 @@ copy .env.example .env
 Example with Docker:
 
 ```bash
-docker run --name murmur-next-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=murmur_next_mvp -p 5432:5432 -d postgres:16
+docker run --name mummur-next-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=mummur_next_mvp -p 5432:5432 -d postgres:16
 ```
 
 4. Generate Prisma Client and run migrations:
@@ -86,7 +86,7 @@ npm run db:studio
    - duration
 6. Paste into the provider manually.
 7. Download the generated `mp3`, `wav`, or `m4a`.
-8. Upload the audio file back to Murmur Next.
+8. Upload the audio file back to Mummur Next MVP.
 
 This workflow does not use unofficial APIs, browser automation, cookies, tokens, or saved provider accounts.
 
@@ -107,7 +107,7 @@ This workflow does not use unofficial APIs, browser automation, cookies, tokens,
    - YouTube Shorts description
 4. Paste into the provider manually.
 5. Download the generated `mp4`, `mov`, or `webm`.
-6. Upload the video file back to Murmur Next.
+6. Upload the video file back to Mummur Next MVP.
 
 This workflow does not call video provider APIs, automate login, or store cookies/tokens.
 
