@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getObjectStorageProvider, isLocalStorageProductionRisk } from "./storage-provider";
+import {
+  getObjectStorageProvider,
+  isLocalStorageProductionRisk,
+  VercelBlobStorageProvider
+} from "./storage-provider";
 
 describe("storage provider", () => {
   it("selects local storage for the MVP", () => {
@@ -11,10 +15,16 @@ describe("storage provider", () => {
     expect(provider.isConfigured).toBe(true);
   });
 
-  it("reserves future object storage providers", () => {
+  it("reserves future S3 and R2 providers", () => {
     expect(getObjectStorageProvider("s3").isConfigured).toBe(false);
     expect(getObjectStorageProvider("r2").providerName).toBe("Cloudflare R2");
-    expect(getObjectStorageProvider("vercel_blob").providerName).toBe("Vercel Blob");
+  });
+
+  it("selects Vercel Blob storage for production uploads", () => {
+    const provider = getObjectStorageProvider("vercel_blob");
+
+    expect(provider).toBeInstanceOf(VercelBlobStorageProvider);
+    expect(provider.providerName).toBe("Vercel Blob");
   });
 
   it("flags local storage as a production durability risk", () => {

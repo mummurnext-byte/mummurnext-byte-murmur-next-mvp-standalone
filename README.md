@@ -66,7 +66,8 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/mummur_next_mvp?schema=public` | PostgreSQL connection string used by Prisma. |
 | `OPENAI_API_KEY` | No | empty | Optional. Leave empty to use mock generation. |
 | `APP_BASE_URL` | Yes | `http://localhost:3000` | Public base URL for the app. |
-| `STORAGE_PROVIDER` | Yes | `local` | Current MVP supports `local`; `s3`, `r2`, and `vercel_blob` are reserved. |
+| `STORAGE_PROVIDER` | Yes | `local` | Use `local` for development or `vercel_blob` for Vercel media uploads. |
+| `BLOB_READ_WRITE_TOKEN` | Required for `vercel_blob` | empty | Vercel Blob read/write token. Configure in Vercel, never commit a real value. |
 | `NODE_ENV` | Yes | `development` | Use `production` on Vercel. |
 | `MAX_UPLOAD_BYTES` | No | `104857600` | Upload size limit in bytes. |
 | `LOCAL_FILE_STORAGE_DIR` | No | `./uploads` | Local development upload directory. Not durable on Vercel. |
@@ -81,7 +82,8 @@ production PostgreSQL database is available.
 2. Add environment variables in Vercel:
    - `DATABASE_URL`
    - `OPENAI_API_KEY` (optional; leave empty to use mock generation)
-   - `STORAGE_PROVIDER` (`local` for this MVP, object storage for production uploads later)
+   - `STORAGE_PROVIDER` (`vercel_blob` for production uploads)
+   - `BLOB_READ_WRITE_TOKEN` (required when `STORAGE_PROVIDER=vercel_blob`)
    - `APP_BASE_URL`
    - `NODE_ENV`
    - `MAX_UPLOAD_BYTES`
@@ -99,16 +101,20 @@ builds.
 
 ### File Uploads on Vercel
 
-This MVP includes `LocalStorageProvider` for local development. Local filesystem
+This MVP includes `LocalStorageProvider` for local development and
+`VercelBlobStorageProvider` for durable Vercel media uploads. Local filesystem
 uploads are not durable in serverless deployments and can disappear between
-deployments or function instances. Before using production uploads on Vercel,
-replace local storage with an object storage implementation.
+deployments or function instances.
 
-Reserved provider keys:
+Provider keys:
+
+- `local`
+- `vercel_blob`
+
+Reserved future provider keys:
 
 - `s3`
 - `r2`
-- `vercel_blob`
 
 The storage abstraction is in `src/lib/storage-provider.ts`. The current upload
 limit is controlled by `MAX_UPLOAD_BYTES`; default is `104857600` bytes.

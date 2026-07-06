@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 
 import { getEnv, type EnvSource, type StorageProviderKey } from "@/lib/env";
 
@@ -59,11 +60,37 @@ export class PlaceholderObjectStorageProvider implements ObjectStorageProvider {
   }
 }
 
+export class VercelBlobStorageProvider implements ObjectStorageProvider {
+  readonly providerKey = "vercel_blob" as const;
+  readonly providerName = "Vercel Blob";
+  readonly isConfigured = Boolean(getEnv().blobReadWriteToken);
+
+  async storeObject(input: StoreObjectInput): Promise<StoredObject> {
+    const storageKey = buildStorageKey(input.fileName);
+    const blob = await put(storageKey, input.buffer, {
+      access: "public",
+      addRandomSuffix: false
+    });
+
+    return { storageKey: blob.url, publicUrl: blob.url };
+  }
+
+  async readObject(storageKey: string): Promise<Buffer> {
+    const response = await fetch(storageKey);
+
+    if (!response.ok) {
+      throw new Error(`Unable to read Vercel Blob object: ${response.status}`);
+    }
+
+    return Buffer.from(await response.arrayBuffer());
+  }
+}
+
 export function getObjectStorageProvider(providerKey = getEnv().storageProvider): ObjectStorageProvider {
   if (providerKey === "local") return new LocalStorageProvider();
   if (providerKey === "s3") return new PlaceholderObjectStorageProvider("s3", "Amazon S3");
   if (providerKey === "r2") return new PlaceholderObjectStorageProvider("r2", "Cloudflare R2");
-  return new PlaceholderObjectStorageProvider("vercel_blob", "Vercel Blob");
+  return new VercelBlobStorageProvider();
 }
 
 export function isLocalStorageProductionRisk(source: EnvSource = process.env) {

@@ -34,4 +34,17 @@ describe("env", () => {
     expect(checks.find((check) => check.label === "LLM provider configured")?.detail).toContain("mock");
     expect(checks.find((check) => check.label === "Upload file size limit")?.detail).toBe("500 bytes");
   });
+
+  it("requires a token when Vercel Blob is selected", () => {
+    const missingToken = validateDeploymentEnv({
+      STORAGE_PROVIDER: "vercel_blob"
+    });
+    const withToken = validateDeploymentEnv({
+      STORAGE_PROVIDER: "vercel_blob",
+      BLOB_READ_WRITE_TOKEN: "example-token"
+    });
+
+    expect(missingToken.find((check) => check.label === "Storage provider configured")?.ok).toBe(false);
+    expect(withToken.find((check) => check.label === "Storage provider configured")?.ok).toBe(true);
+  });
 });

@@ -15,6 +15,7 @@ export function getEnv(source: EnvSource = process.env) {
     appBaseUrl: source.APP_BASE_URL ?? "http://localhost:3000",
     databaseUrl: source.DATABASE_URL ?? "",
     openaiApiKey: source.OPENAI_API_KEY ?? "",
+    blobReadWriteToken: source.BLOB_READ_WRITE_TOKEN ?? "",
     storageProvider: parseStorageProvider(source.STORAGE_PROVIDER),
     localFileStorageDir: source.LOCAL_FILE_STORAGE_DIR ?? "./uploads",
     maxUploadBytes: Number.isFinite(maxUploadBytes) && maxUploadBytes > 0 ? maxUploadBytes : 104857600,
@@ -35,11 +36,8 @@ export function validateDeploymentEnv(source: EnvSource = process.env): Deployme
     },
     {
       label: "Storage provider configured",
-      ok: env.storageProvider === "local",
-      detail:
-        env.storageProvider === "local"
-          ? "Using LocalStorageProvider. Use object storage before production uploads."
-          : `${env.storageProvider} is selected but not implemented in this MVP.`
+      ok: env.storageProvider === "local" || (env.storageProvider === "vercel_blob" && Boolean(env.blobReadWriteToken)),
+      detail: storageProviderDetail(env)
     },
     {
       label: "LLM provider configured",
@@ -67,4 +65,18 @@ export function validateDeploymentEnv(source: EnvSource = process.env): Deployme
 export function parseStorageProvider(value?: string): StorageProviderKey {
   if (value === "s3" || value === "r2" || value === "vercel_blob") return value;
   return "local";
+}
+
+function storageProviderDetail(env: ReturnType<typeof getEnv>) {
+  if (env.storageProvider === "local") {
+    return "Using LocalStorageProvider. Use object storage before production uploads.";
+  }
+
+  if (env.storageProvider === "vercel_blob") {
+    return env.blobReadWriteToken
+      ? "Using Vercel Blob for durable uploaded media."
+      : "Vercel Blob selected but BLOB_READ_WRITE_TOKEN is missing.";
+  }
+
+  return `${env.storageProvider} is selected but not implemented in this MVP.`;
 }
