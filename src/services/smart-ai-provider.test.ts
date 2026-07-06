@@ -63,4 +63,46 @@ describe("smart ai provider factory", () => {
       })
     ).rejects.toThrow("lyrics must be a non-empty string");
   });
+
+  it("keeps Gemini API keys out of request URLs", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    songTitle: "Safe Request",
+                    lyrics: "Safe lyrics",
+                    hook: "Safe hook",
+                    hashtags: ["#Safe"]
+                  })
+                }
+              ]
+            }
+          }
+        ]
+      })
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new GeminiProvider("gemini-secret", "gemini-test").generate({
+      systemPrompt: "System",
+      userPrompt: "User",
+      schema: lyricsSchema,
+      fallbackOutput: {
+        songTitle: "Fallback",
+        lyrics: "Fallback lyrics",
+        hook: "Fallback hook",
+        hashtags: ["#Fallback"]
+      }
+    });
+
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    const [url, init] = calls[0];
+    expect(String(url)).not.toContain("gemini-secret");
+    expect(init.headers).toMatchObject({ "x-goog-api-key": "gemini-secret" });
+  });
 });

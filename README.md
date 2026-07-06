@@ -11,8 +11,10 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
+- Optionally call a configured LLM provider for Smart AI Singer text generation.
 
-No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
+Music, video, TikTok, and YouTube providers remain manual in this MVP. Smart AI
+Singer falls back to mock generation when no LLM provider key is configured.
 
 ## Requirements
 
