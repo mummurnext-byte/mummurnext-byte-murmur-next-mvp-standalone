@@ -5,14 +5,14 @@ Standalone AI digital-human music content system.
 This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
-- Generate mock 7-day Content Plans.
+- Generate 7-day Content Plans with Mock LLM or optional OpenAI fallback.
 - Prepare manual Suno / MakeBestMusic music prompts.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
 
-No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
+No music, video, TikTok, or YouTube APIs are called in this MVP. OpenAI is optional for text generation and automatically falls back to Mock LLM when no API key is configured.
 
 ## Requirements
 
@@ -70,6 +70,30 @@ npm run db:migrate
 npm run db:studio
 ```
 
+## LLM Provider
+
+Mummur Next MVP supports two LLM providers:
+
+- `MockLLMProvider`: default local generator.
+- `OpenAIProvider`: optional Responses API provider.
+
+Set `OPENAI_API_KEY` in your local `.env` to enable OpenAI. If the key is missing, invalid, or the request fails, the app falls back to `MockLLMProvider` and displays a fallback notice instead of crashing the page.
+
+Optional model setting:
+
+```bash
+OPENAI_MODEL="gpt-5.5"
+```
+
+LLM usage is limited to text context for:
+
+- Weekly Plan generation
+- Music Prompt generation
+- Video Brief generation
+- Publish Copy generation
+
+Uploaded audio/video files are not sent to the LLM.
+
 ## Manual Music Workflow
 
 1. Create a Digital Human with Persona and Consent.
@@ -115,6 +139,7 @@ This workflow does not call video provider APIs, automate login, or store cookie
 
 Provider abstractions live under `src/services`:
 
+- `LLMProvider`
 - `MusicProvider`
 - `VideoProvider`
 

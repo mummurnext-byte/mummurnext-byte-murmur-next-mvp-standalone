@@ -2,6 +2,14 @@
 
 Mummur Next MVP uses Server Actions for back-office mutations and one media route for playback.
 
+## LLM Provider
+
+- `MockLLMProvider` is used by default.
+- `OpenAIProvider` is used only when `OPENAI_API_KEY` is configured or selected and available.
+- OpenAI calls use the Responses API with structured JSON output.
+- LLM output is schema-validated before use.
+- Failed OpenAI calls fall back to Mock LLM and surface a fallback notice in the UI.
+
 ## Server Actions
 
 - `createDigitalHumanAction`
@@ -12,6 +20,13 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `updateContentPlanStatusAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
+
+## Generated Text Surfaces
+
+- Weekly Plan generation
+- Music Prompt generation
+- Video Brief generation
+- Publish Copy generation
 
 ## Media Route
 
@@ -40,6 +55,7 @@ Video:
 
 ## Security Boundaries
 
-- No real provider APIs are called.
+- No music, video, TikTok, or YouTube APIs are called.
 - No cookies, session tokens, provider credentials, or API keys are stored.
 - Browser automation is intentionally not used.
+- Uploaded files are not sent to the LLM.

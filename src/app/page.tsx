@@ -13,7 +13,9 @@ import {
 } from "@/app/actions";
 import { CopyFields } from "@/components/copy-fields";
 import { prisma } from "@/lib/prisma";
+import type { LLMProviderKey } from "@/services/llm-provider";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
+import { buildPublishCopyPackage } from "@/services/publish-copy";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +32,12 @@ export default async function Home({
     planId?: string;
     musicProvider?: string;
     videoProvider?: string;
+    llmProvider?: string;
+    llmError?: string;
   }>;
 }) {
   const params = await searchParams;
+  const selectedLLMProvider = llmProviderFromParam(params?.llmProvider);
   const [digitalHumans, contentPlans, selectedHuman, selectedPlan] = await Promise.all([
     prisma.digitalHuman.findMany({
       where: { deletedAt: null },
@@ -51,9 +56,10 @@ export default async function Home({
         <header>
           <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
           <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-            Standalone AI digital-human music content system. No Back Office modules, no real AI
-            provider API calls, no cookies or tokens.
+            Standalone AI digital-human music content system. No Back Office modules, no platform
+            automation, no cookies or tokens. OpenAI is optional and falls back to Mock LLM.
           </p>
+          {params?.llmError ? <LLMNotice error={params.llmError} providerName="Mock LLM" /> : null}
         </header>
 
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
@@ -104,12 +110,15 @@ export default async function Home({
           </section>
 
           <section className="space-y-4">
-            {selectedHuman ? <SelectedHumanPanel human={selectedHuman} /> : null}
+            {selectedHuman ? (
+              <SelectedHumanPanel human={selectedHuman} selectedLLMProvider={selectedLLMProvider} />
+            ) : null}
             {selectedPlan ? (
               <SelectedPlanPanel
                 contentPlan={selectedPlan}
                 selectedMusicProvider={params?.musicProvider}
                 selectedVideoProvider={params?.videoProvider}
+                selectedLLMProvider={selectedLLMProvider}
               />
             ) : null}
             <ContentPlansPanel contentPlans={contentPlans} />
@@ -156,7 +165,13 @@ async function loadContentPlans() {
   });
 }
 
-function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>> }) {
+function SelectedHumanPanel({
+  human,
+  selectedLLMProvider
+}: {
+  human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>>;
+  selectedLLMProvider: LLMProviderKey | null;
+}) {
   return (
     <Panel title={`Digital Human: ${human.displayName}`}>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -189,6 +204,12 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
 
           <form action={generateWeeklyPlanAction} className="rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="digitalHumanId" value={human.id} />
+            <Select label="LLM provider" name="llmProvider" defaultValue={selectedLLMProvider ?? ""}>
+              <option value="">Auto</option>
+              <option value="mock">Mock LLM</option>
+              <option value="openai">OpenAI</option>
+            </Select>
+            <p className="mt-2 text-xs text-zinc-500">Auto uses OpenAI only when OPENAI_API_KEY is configured.</p>
             <Submit>Generate 7-day Plan</Submit>
           </form>
 
@@ -212,23 +233,30 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
   );
 }
 
-function SelectedPlanPanel({
+async function SelectedPlanPanel({
   contentPlan,
   selectedMusicProvider,
-  selectedVideoProvider
+  selectedVideoProvider,
+  selectedLLMProvider
 }: {
   contentPlan: NonNullable<SelectedPlan>;
   selectedMusicProvider?: string;
   selectedVideoProvider?: string;
+  selectedLLMProvider: LLMProviderKey | null;
 }) {
   const audioAssets = contentPlan.publishAssets.filter((asset) => asset.assetType === "audio");
   const videoAssets = contentPlan.publishAssets.filter((asset) => asset.assetType === "video");
   const latestAudioAsset = audioAssets[0];
   const musicProvider = getMusicProvider(selectedMusicProvider);
   const videoProvider = getVideoProvider(selectedVideoProvider);
-  const musicPrompt = musicProvider.buildPrompt({ contentPlan });
+  const musicPrompt = await musicProvider.buildPrompt({ contentPlan, llmProviderKey: selectedLLMProvider });
+  const publishCopy = await buildPublishCopyPackage(contentPlan, selectedLLMProvider);
   const videoPrompt = latestAudioAsset
-    ? videoProvider.buildPrompt({ contentPlan, musicAsset: latestAudioAsset })
+    ? await videoProvider.buildPrompt({
+        contentPlan,
+        musicAsset: latestAudioAsset,
+        llmProviderKey: selectedLLMProvider
+      })
     : null;
 
   return (
@@ -237,9 +265,28 @@ function SelectedPlanPanel({
         <div className="space-y-4">
           <ProviderSelect
             planId={contentPlan.id}
+            label="LLM provider"
+            name="llmProvider"
+            selected={selectedLLMProvider ?? ""}
+            keepMusicProvider={musicProvider.providerKey}
+            keepVideoProvider={videoProvider.providerKey}
+            options={[
+              { key: "", name: "Auto" },
+              { key: "mock", name: "Mock LLM" },
+              { key: "openai", name: "OpenAI" }
+            ]}
+          />
+          <LLMNotice
+            providerName={musicPrompt.llmProviderName}
+            error={musicPrompt.llmError ?? publishCopy.llmError ?? videoPrompt?.llmError ?? null}
+            usedFallback={musicPrompt.llmUsedFallback || publishCopy.llmUsedFallback || Boolean(videoPrompt?.llmUsedFallback)}
+          />
+          <ProviderSelect
+            planId={contentPlan.id}
             label="Music provider"
             name="musicProvider"
             selected={musicProvider.providerKey}
+            keepLLMProvider={selectedLLMProvider}
             options={musicProviders.map((provider) => ({
               key: provider.providerKey,
               name: provider.providerName
@@ -259,6 +306,22 @@ function SelectedPlanPanel({
             ]}
           />
 
+          <CopyFields
+            title="LLM Publish Copy"
+            description="Copy these fields into manual TikTok or YouTube publishing workflows."
+            fields={[
+              { key: "title", label: "Title", value: publishCopy.title },
+              { key: "description", label: "Description", value: publishCopy.description },
+              { key: "tiktokCaption", label: "TikTok Caption", value: publishCopy.tiktokCaption },
+              {
+                key: "youtubeShortsDescription",
+                label: "YouTube Shorts Description",
+                value: publishCopy.youtubeShortsDescription
+              },
+              { key: "hashtags", label: "Hashtags", value: publishCopy.hashtags.join(" ") }
+            ]}
+          />
+
           {videoPrompt ? (
             <>
               <ProviderSelect
@@ -267,6 +330,7 @@ function SelectedPlanPanel({
                 name="videoProvider"
                 selected={videoProvider.providerKey}
                 keepMusicProvider={musicProvider.providerKey}
+                keepLLMProvider={selectedLLMProvider}
                 options={videoProviders.map((provider) => ({
                   key: provider.providerKey,
                   name: provider.providerName
@@ -359,7 +423,9 @@ function ProviderSelect({
   name,
   selected,
   options,
-  keepMusicProvider
+  keepMusicProvider,
+  keepVideoProvider,
+  keepLLMProvider
 }: {
   planId: string;
   label: string;
@@ -367,11 +433,15 @@ function ProviderSelect({
   selected: string;
   options: { key: string; name: string }[];
   keepMusicProvider?: string;
+  keepVideoProvider?: string;
+  keepLLMProvider?: string | null;
 }) {
   return (
     <form action="/" className="flex flex-wrap items-end gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
       <input type="hidden" name="planId" value={planId} />
       {keepMusicProvider ? <input type="hidden" name="musicProvider" value={keepMusicProvider} /> : null}
+      {keepVideoProvider ? <input type="hidden" name="videoProvider" value={keepVideoProvider} /> : null}
+      {keepLLMProvider ? <input type="hidden" name="llmProvider" value={keepLLMProvider} /> : null}
       <Select label={label} name={name} defaultValue={selected}>
         {options.map((option) => (
           <option key={option.key} value={option.key}>
@@ -459,6 +529,31 @@ function AssetList({
   );
 }
 
+function LLMNotice({
+  providerName,
+  error,
+  usedFallback = Boolean(error)
+}: {
+  providerName: string;
+  error: string | null;
+  usedFallback?: boolean;
+}) {
+  if (!error && !usedFallback) {
+    return (
+      <div className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-500">
+        LLM provider: {providerName}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-amber-700/60 bg-amber-950/30 p-3 text-sm text-amber-100">
+      LLM fallback active: showing Mock LLM output.
+      {error ? <div className="mt-1 text-xs text-amber-200/80">{error}</div> : null}
+    </div>
+  );
+}
+
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
@@ -523,6 +618,11 @@ function formatDate(date: Date) {
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
+}
+
+function llmProviderFromParam(value?: string): LLMProviderKey | null {
+  if (value === "mock" || value === "openai") return value;
+  return null;
 }
 
 function isUuid(value: string) {

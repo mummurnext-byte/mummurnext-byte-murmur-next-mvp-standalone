@@ -7,6 +7,7 @@
 - Created standalone Mummur Next MVP project separated from Mummur Back Office.
 - Added Prisma schema and migration for Digital Humans, Personas, Consent Records, Song Ideas, Content Plans, Publish Assets, Platform Posts, and File Assets.
 - Added mock weekly plan generation.
+- Added configurable LLM Provider architecture with Mock and optional OpenAI providers.
 - Added manual Suno and MakeBestMusic music provider workflow.
 - Added manual HeyGen, Akool, and D-ID video provider workflow.
 - Added music and video upload with local file metadata and playback.

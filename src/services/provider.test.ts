@@ -4,9 +4,10 @@ import { getMusicProvider, musicProviders } from "./music-provider";
 import { getVideoProvider, videoProviders } from "./video-provider";
 
 describe("manual providers", () => {
-  it("selects music providers and builds prompts", () => {
-    const prompt = getMusicProvider("suno_manual").buildPrompt({
-      contentPlan: contentPlanFixture()
+  it("selects music providers and builds prompts", async () => {
+    const prompt = await getMusicProvider("suno_manual").buildPrompt({
+      contentPlan: contentPlanFixture(),
+      llmProviderKey: "mock"
     });
 
     expect(musicProviders.map((provider) => provider.providerKey)).toEqual([
@@ -19,10 +20,11 @@ describe("manual providers", () => {
     expect(prompt.lyrics).toContain("[Chorus]");
   });
 
-  it("selects video providers and builds prompts", () => {
-    const prompt = getVideoProvider("akool_manual").buildPrompt({
+  it("selects video providers and builds prompts", async () => {
+    const prompt = await getVideoProvider("akool_manual").buildPrompt({
       contentPlan: contentPlanFixture(),
-      musicAsset: { provider: "suno_manual", metadata: { originalName: "song.m4a" } }
+      musicAsset: { provider: "suno_manual", metadata: { originalName: "song.m4a" } },
+      llmProviderKey: "mock"
     });
 
     expect(videoProviders.map((provider) => provider.providerKey)).toEqual([

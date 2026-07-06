@@ -1,22 +1,16 @@
-import type { DigitalHuman, Persona, TargetPlatform } from "@prisma/client";
+import type { DigitalHuman, Persona } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import {
+  getConfiguredLLMProvider,
+  MockLLMProvider,
+  withLLMFallback,
+  type LLMProviderKey
+} from "@/services/llm-provider";
 
 type HumanWithPersona = DigitalHuman & { persona: Persona | null };
 
-const themes = [
-  "quiet confidence",
-  "late night reset",
-  "founder glow up",
-  "summer revenge",
-  "soft launch romance",
-  "city lights",
-  "future self"
-];
-
-const platforms: TargetPlatform[] = ["tiktok", "youtube_shorts", "youtube"];
-
-export async function generateWeeklyPlan(digitalHumanId: string) {
+export async function generateWeeklyPlan(digitalHumanId: string, providerKey?: LLMProviderKey | null) {
   const digitalHuman = await prisma.digitalHuman.findFirst({
     where: { id: digitalHumanId, deletedAt: null },
     include: { persona: true }
@@ -54,10 +48,14 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
     throw new Error("This digital human already has a plan in the current 7-day window.");
   }
 
-  const items = mockGenerateWeeklyPlan(digitalHuman);
+  const generation = await withLLMFallback(
+    getConfiguredLLMProvider(providerKey),
+    (mock) => mock.generateWeeklyPlan(promptDigitalHuman(digitalHuman)),
+    (provider) => provider.generateWeeklyPlan(promptDigitalHuman(digitalHuman))
+  );
 
   await prisma.$transaction(
-    items.map((item, index) =>
+    generation.value.map((item, index) =>
       prisma.songIdea.create({
         data: {
           digitalHumanId,
@@ -84,25 +82,12 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
       })
     )
   );
+
+  return generation;
 }
 
 export function mockGenerateWeeklyPlan(digitalHuman: HumanWithPersona) {
-  return themes.map((theme, index) => {
-    const platform = platforms[index % platforms.length];
-    const title = `${digitalHuman.displayName} - ${titleCase(theme)}`;
-    const tag = digitalHuman.displayName.replace(/\s+/g, "");
-
-    return {
-      theme,
-      lyricsDirection: `Write a concise hook about ${theme} for ${digitalHuman.persona?.audience}.`,
-      videoScript: `Open with ${digitalHuman.displayName} facing camera, cut to a hook moment, close with a reusable short-form loop.`,
-      musicPrompt: `${digitalHuman.persona?.musicStyle ?? "modern pop"} song about ${theme}.`,
-      title,
-      caption: `${title}. Original AI music concept for short-form video.`,
-      hashtags: ["#MummurNext", `#${tag}`, "#AIMusic"],
-      targetPlatform: platform
-    };
-  });
+  return new MockLLMProvider().generateWeeklyPlan(promptDigitalHuman(digitalHuman));
 }
 
 function startOfDay(date: Date) {
@@ -117,6 +102,17 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
-function titleCase(value: string) {
-  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+function promptDigitalHuman(digitalHuman: HumanWithPersona) {
+  if (!digitalHuman.persona) throw new Error("Digital human persona is required.");
+  return {
+    displayName: digitalHuman.displayName,
+    persona: {
+      archetype: digitalHuman.persona.archetype,
+      backstory: digitalHuman.persona.backstory,
+      toneOfVoice: digitalHuman.persona.toneOfVoice,
+      audience: digitalHuman.persona.audience,
+      musicStyle: digitalHuman.persona.musicStyle,
+      visualStyle: digitalHuman.persona.visualStyle
+    }
+  };
 }

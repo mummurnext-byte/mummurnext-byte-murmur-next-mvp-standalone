@@ -15,6 +15,7 @@ import {
 import type { MusicProviderKey } from "@/services/music-provider";
 import { musicProviders } from "@/services/music-provider";
 import { generateWeeklyPlan } from "@/services/weekly-plan";
+import type { LLMProviderKey } from "@/services/llm-provider";
 import type { VideoProviderKey } from "@/services/video-provider";
 import { videoProviders } from "@/services/video-provider";
 
@@ -89,8 +90,14 @@ export async function addConsentRecordAction(formData: FormData) {
 }
 
 export async function generateWeeklyPlanAction(formData: FormData) {
-  await generateWeeklyPlan(requiredString(formData, "digitalHumanId"));
+  const digitalHumanId = requiredString(formData, "digitalHumanId");
+  const llmProvider = llmProviderFromForm(formData);
+  const generation = await generateWeeklyPlan(digitalHumanId, llmProvider);
   revalidatePath("/");
+  const params = new URLSearchParams({ digitalHumanId });
+  if (llmProvider) params.set("llmProvider", llmProvider);
+  if (generation.error) params.set("llmError", generation.error);
+  redirect(`/?${params.toString()}`);
 }
 
 export async function updateContentPlanCopyAction(formData: FormData) {
@@ -258,6 +265,13 @@ function isMusicProvider(value: string): value is MusicProviderKey {
 
 function isVideoProvider(value: string): value is VideoProviderKey {
   return videoProviders.some((provider) => provider.providerKey === value);
+}
+
+function llmProviderFromForm(formData: FormData): LLMProviderKey | null {
+  const value = optionalString(formData, "llmProvider");
+  if (!value) return null;
+  if (value === "mock" || value === "openai") return value;
+  throw new Error("LLM provider is not supported.");
 }
 
 function nextMusicUploadStatus(status: ContentStatus): ContentStatus {
