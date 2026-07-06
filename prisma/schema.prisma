@@ -121,7 +121,7 @@ model ContentPlan {
   digitalHuman   DigitalHuman    @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
   songIdea       SongIdea        @relation(fields: [songIdeaId], references: [id], onDelete: Restrict)
   publishAssets  PublishAsset[]
-  platformPosts  PlatformPost[]
+  publishRecords PublishRecord[]
 
   @@index([digitalHumanId])
   @@index([songIdeaId])
@@ -164,25 +164,23 @@ model PublishAsset {
   @@map("publish_assets")
 }
 
-model PlatformPost {
+model PublishRecord {
   id                 String                @id @default(uuid()) @db.Uuid
   contentPlanId      String                @map("content_plan_id") @db.Uuid
   platform           TargetPlatform
   status             PublishStatus         @default(draft)
-  publishTitle       String?               @map("publish_title")
-  publishDescription String?               @map("publish_description")
+  title              String?               @map("publish_title")
+  description        String?               @map("publish_description")
   hashtags           String[]              @default([])
   scheduledAt        DateTime?             @map("scheduled_at") @db.Timestamptz(6)
   publishedUrl       String?               @map("published_url")
-  platformPostId     String?               @map("platform_post_id")
-  postUrl            String?               @map("post_url")
   publishedAt        DateTime?             @map("published_at") @db.Timestamptz(6)
-  errorMessage       String?               @map("error_message")
+  failureReason      String?               @map("error_message")
   createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt          DateTime?             @map("deleted_at") @db.Timestamptz(6)
   contentPlan        ContentPlan           @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
-  histories          PlatformPostHistory[]
+  histories          PublishRecordHistory[]
 
   @@index([contentPlanId])
   @@index([platform])
@@ -191,15 +189,15 @@ model PlatformPost {
   @@map("platform_posts")
 }
 
-model PlatformPostHistory {
+model PublishRecordHistory {
   id             String         @id @default(uuid()) @db.Uuid
-  platformPostId String         @map("platform_post_id") @db.Uuid
+  publishRecordId String        @map("platform_post_id") @db.Uuid
   status         PublishStatus
   note           String?
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  platformPost   PlatformPost   @relation(fields: [platformPostId], references: [id], onDelete: Restrict)
+  publishRecord  PublishRecord  @relation(fields: [publishRecordId], references: [id], onDelete: Restrict)
 
-  @@index([platformPostId])
+  @@index([publishRecordId])
   @@index([status])
   @@map("platform_post_histories")
 }

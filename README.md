@@ -121,7 +121,7 @@ This workflow does not call video provider APIs, automate login, or store cookie
    - YouTube Shorts
    - YouTube
 4. Enter publish title, description, hashtags, optional scheduled time, and optional failure note.
-5. Save the platform post as `draft`, `ready`, `scheduled`, or `failed`.
+5. Save the publish record as `draft`, `ready`, `scheduled`, or `failed`.
 6. After manually publishing on the platform, paste the published URL and mark the post as `published`.
 7. Review publish history entries on the Content Plan.
 

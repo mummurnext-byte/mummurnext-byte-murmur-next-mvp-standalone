@@ -19,10 +19,33 @@ export function isPublishPlatform(value: string): value is TargetPlatform {
 
 export function defaultPublishCopy(contentPlan: PublishCopySource) {
   return {
-    publishTitle: contentPlan.title,
-    publishDescription: contentPlan.caption,
+    title: contentPlan.title,
+    description: contentPlan.caption,
     hashtags: contentPlan.hashtags
   };
+}
+
+export function assertPublishStatusTransition(input: {
+  status: PublishStatus;
+  hasVideo: boolean;
+  publishedUrl?: string | null;
+  failureReason?: string | null;
+}) {
+  if (input.status === "ready" && !input.hasVideo) {
+    throw new Error("A video asset is required before marking a publish record ready.");
+  }
+
+  if (input.status === "scheduled" && !input.hasVideo) {
+    throw new Error("A video asset is required before scheduling a publish record.");
+  }
+
+  if (input.status === "published" && !input.publishedUrl) {
+    throw new Error("publishedUrl is required when marking a publish record published.");
+  }
+
+  if (input.status === "failed" && !input.failureReason) {
+    throw new Error("failureReason is required when marking a publish record failed.");
+  }
 }
 
 export function splitPublishHashtags(value: string) {

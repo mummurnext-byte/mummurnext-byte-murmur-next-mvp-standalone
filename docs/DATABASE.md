@@ -11,8 +11,8 @@ The database is PostgreSQL through Prisma.
 - `ContentPlan`: scheduled content item and production status.
 - `FileAsset`: uploaded file metadata.
 - `PublishAsset`: uploaded audio/video metadata linked to a content plan.
-- `PlatformPost`: manual platform publishing record.
-- `PlatformPostHistory`: status history for platform publishing.
+- `PublishRecord`: manual platform publishing record.
+- `PublishRecordHistory`: status history for platform publishing.
 
 ## Status Flow
 
@@ -44,7 +44,7 @@ Both store file metadata in `PublishAsset.metadata`, including `fileAssetId`, or
 
 ## Publish Workflow
 
-`PlatformPost.status`:
+`PublishRecord.status`:
 
 - `draft`
 - `ready`
@@ -52,14 +52,14 @@ Both store file metadata in `PublishAsset.metadata`, including `fileAssetId`, or
 - `published`
 - `failed`
 
-Platform posts store manual publishing data:
+Publish records store manual publishing data:
 
 - platform: `tiktok`, `youtube_shorts`, or `youtube`
-- publish title
-- publish description
+- title
+- description
 - hashtags
 - scheduled publish time
 - published URL
-- failure message
+- failure reason
 
-Every publish status save creates a `PlatformPostHistory` entry. Marking a post as published also advances the parent `ContentPlan.status` to `published`.
+Every publish status save creates a `PublishRecordHistory` entry. Marking a record as published also advances the parent `ContentPlan.status` to `published`.

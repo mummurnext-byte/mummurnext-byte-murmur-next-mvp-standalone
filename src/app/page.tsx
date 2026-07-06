@@ -5,8 +5,8 @@ import {
   addConsentRecordAction,
   createDigitalHumanAction,
   generateWeeklyPlanAction,
-  markPlatformPostPublishedAction,
-  savePlatformPostAction,
+  markPublishRecordPublishedAction,
+  savePublishRecordAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -156,7 +156,7 @@ async function loadSelectedPlan(id: string) {
         orderBy: { createdAt: "desc" },
         take: 20
       },
-      platformPosts: {
+      publishRecords: {
         where: { deletedAt: null },
         orderBy: [{ platform: "asc" }, { createdAt: "desc" }],
         include: {
@@ -175,30 +175,34 @@ async function loadContentPlans() {
     where: { deletedAt: null },
     orderBy: [{ scheduledDate: "asc" }, { createdAt: "asc" }],
     take: 100,
-    include: { digitalHuman: true, songIdea: true, platformPosts: { where: { deletedAt: null } } }
+    include: { digitalHuman: true, songIdea: true, publishRecords: { where: { deletedAt: null } } }
   });
 }
 
 async function loadPublishStats() {
-  const counts = await prisma.platformPost.groupBy({
+  const counts = await prisma.publishRecord.groupBy({
     by: ["status"],
-    where: { deletedAt: null, status: { in: ["ready", "scheduled", "published"] } },
+    where: { deletedAt: null },
     _count: true
   });
 
   return {
+    draft: counts.find((count) => count.status === "draft")?._count ?? 0,
     ready: counts.find((count) => count.status === "ready")?._count ?? 0,
     scheduled: counts.find((count) => count.status === "scheduled")?._count ?? 0,
-    published: counts.find((count) => count.status === "published")?._count ?? 0
+    published: counts.find((count) => count.status === "published")?._count ?? 0,
+    failed: counts.find((count) => count.status === "failed")?._count ?? 0
   };
 }
 
 function PublishStatsPanel({ stats }: { stats: Awaited<ReturnType<typeof loadPublishStats>> }) {
   return (
-    <section className="grid gap-3 sm:grid-cols-3">
+    <section className="grid gap-3 sm:grid-cols-5">
+      <Metric label="Draft" value={stats.draft} />
       <Metric label="Ready" value={stats.ready} />
       <Metric label="Scheduled" value={stats.scheduled} />
       <Metric label="Published" value={stats.published} />
+      <Metric label="Failed" value={stats.failed} />
     </section>
   );
 }
@@ -430,58 +434,58 @@ function PublishWorkflowPanel({
         <p className="text-sm text-zinc-400">Upload a video asset before preparing platform publishing.</p>
       ) : (
         <>
-          <PublishPostForm
+          <PublishRecordForm
             contentPlanId={contentPlan.id}
             platform={contentPlan.targetPlatform}
             status="ready"
-            publishTitle={defaults.publishTitle}
-            publishDescription={defaults.publishDescription}
+            title={defaults.title}
+            description={defaults.description}
             hashtags={defaults.hashtags}
             submitLabel="Save Publish Prep"
           />
 
           <div className="space-y-3">
             <div className="text-sm font-medium">Publish History</div>
-            {contentPlan.platformPosts.length === 0 ? (
-              <p className="text-sm text-zinc-400">No platform posts yet.</p>
+            {contentPlan.publishRecords.length === 0 ? (
+              <p className="text-sm text-zinc-400">No publish records yet.</p>
             ) : (
-              contentPlan.platformPosts.map((post) => (
-                <div key={post.id} className="space-y-3 rounded border border-zinc-800 p-3">
+              contentPlan.publishRecords.map((record) => (
+                <div key={record.id} className="space-y-3 rounded border border-zinc-800 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <div className="text-sm font-medium">{platformLabels[post.platform]}</div>
-                      <div className="text-xs text-zinc-500">Status: {post.status}</div>
+                      <div className="text-sm font-medium">{platformLabels[record.platform]}</div>
+                      <div className="text-xs text-zinc-500">Status: {record.status}</div>
                     </div>
-                    {post.publishedUrl ? (
-                      <a className="text-xs text-zinc-300 underline" href={post.publishedUrl}>
+                    {record.publishedUrl ? (
+                      <a className="text-xs text-zinc-300 underline" href={record.publishedUrl}>
                         Published URL
                       </a>
                     ) : null}
                   </div>
 
-                  <PublishPostForm
+                  <PublishRecordForm
                     contentPlanId={contentPlan.id}
-                    platform={post.platform}
-                    status={post.status === "published" ? "ready" : post.status}
-                    publishTitle={post.publishTitle ?? defaults.publishTitle}
-                    publishDescription={post.publishDescription ?? defaults.publishDescription}
-                    hashtags={post.hashtags.length > 0 ? post.hashtags : defaults.hashtags}
-                    scheduledAt={post.scheduledAt}
-                    errorMessage={post.errorMessage ?? ""}
+                    platform={record.platform}
+                    status={record.status === "published" ? "ready" : record.status}
+                    title={record.title ?? defaults.title}
+                    description={record.description ?? defaults.description}
+                    hashtags={record.hashtags.length > 0 ? record.hashtags : defaults.hashtags}
+                    scheduledAt={record.scheduledAt}
+                    failureReason={record.failureReason ?? ""}
                     submitLabel="Update Publish Record"
                   />
 
-                  <form action={markPlatformPostPublishedAction} className="grid gap-3 rounded border border-zinc-800 p-3">
-                    <input type="hidden" name="id" value={post.id} />
-                    <Input label="Published URL" name="publishedUrl" defaultValue={post.publishedUrl ?? ""} required />
+                  <form action={markPublishRecordPublishedAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+                    <input type="hidden" name="id" value={record.id} />
+                    <Input label="Published URL" name="publishedUrl" defaultValue={record.publishedUrl ?? ""} required />
                     <Submit>Mark Published</Submit>
                   </form>
 
-                  {post.histories.length === 0 ? (
+                  {record.histories.length === 0 ? (
                     <p className="text-xs text-zinc-500">No history entries yet.</p>
                   ) : (
                     <ul className="space-y-1 text-xs text-zinc-500">
-                      {post.histories.map((history) => (
+                      {record.histories.map((history) => (
                         <li key={history.id}>
                           {formatDateTime(history.createdAt)} / {history.status}
                           {history.note ? ` / ${history.note}` : ""}
@@ -499,29 +503,29 @@ function PublishWorkflowPanel({
   );
 }
 
-function PublishPostForm({
+function PublishRecordForm({
   contentPlanId,
   platform,
   status,
-  publishTitle,
-  publishDescription,
+  title,
+  description,
   hashtags,
   scheduledAt,
-  errorMessage,
+  failureReason,
   submitLabel
 }: {
   contentPlanId: string;
   platform: TargetPlatform;
   status: Exclude<PublishStatus, "published">;
-  publishTitle: string;
-  publishDescription: string;
+  title: string;
+  description: string;
   hashtags: string[];
   scheduledAt?: Date | null;
-  errorMessage?: string;
+  failureReason?: string;
   submitLabel: string;
 }) {
   return (
-    <form action={savePlatformPostAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+    <form action={savePublishRecordAction} className="grid gap-3 rounded border border-zinc-800 p-3">
       <input type="hidden" name="contentPlanId" value={contentPlanId} />
       <Select label="Platform" name="platform" defaultValue={platform}>
         {publishPlatforms.map((option) => (
@@ -537,8 +541,8 @@ function PublishPostForm({
           </option>
         ))}
       </Select>
-      <Input label="Publish title" name="publishTitle" defaultValue={publishTitle} required />
-      <Textarea label="Publish description" name="publishDescription" defaultValue={publishDescription} required />
+      <Input label="Publish title" name="title" defaultValue={title} required />
+      <Textarea label="Publish description" name="description" defaultValue={description} required />
       <Textarea label="Hashtags" name="hashtags" defaultValue={hashtags.join(" ")} required />
       <Input
         label="Scheduled at"
@@ -546,7 +550,7 @@ function PublishPostForm({
         type="datetime-local"
         defaultValue={scheduledAt ? formatDateTimeInput(scheduledAt) : ""}
       />
-      <Textarea label="Failure note" name="errorMessage" defaultValue={errorMessage ?? ""} />
+      <Textarea label="Failure reason" name="failureReason" defaultValue={failureReason ?? ""} />
       <Submit>{submitLabel}</Submit>
     </form>
   );
@@ -604,9 +608,9 @@ function ContentPlansPanel({
                 <span>{formatDate(plan.scheduledDate)}</span>
                 <span>{plan.targetPlatform}</span>
                 <span>{plan.status}</span>
-                {plan.platformPosts.length > 0 ? (
+                {plan.publishRecords.length > 0 ? (
                   <span>
-                    publish: {plan.platformPosts.map((post) => `${platformLabels[post.platform]} ${post.status}`).join(", ")}
+                    publish: {plan.publishRecords.map((record) => `${platformLabels[record.platform]} ${record.status}`).join(", ")}
                   </span>
                 ) : null}
                 <span>{plan.digitalHuman.displayName}</span>
