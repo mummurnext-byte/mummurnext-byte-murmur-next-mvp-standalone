@@ -25,6 +25,7 @@ describe("deployment checklist", () => {
     const checklist = buildDeploymentChecklist({
       databaseConnected: false,
       env: {
+        LLM_PROVIDER: "openai",
         OPENAI_API_KEY: "secret-key",
         STORAGE_PROVIDER: "local"
       }
@@ -33,7 +34,7 @@ describe("deployment checklist", () => {
     const text = renderDeploymentChecklistText(checklist);
 
     expect(text).toContain("WARN Database connected");
-    expect(text).toContain("OpenAI key is configured");
+    expect(text).toContain("openai key is configured");
     expect(text).not.toContain("secret-key");
   });
 });

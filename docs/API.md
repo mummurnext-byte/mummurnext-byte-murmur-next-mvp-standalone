@@ -43,8 +43,7 @@ Shows:
 - App base URL
 - Environment mode
 
-The page does not render `DATABASE_URL`, `OPENAI_API_KEY`, tokens, cookies, or
-other secrets.
+The page does not render `DATABASE_URL`, LLM API keys, tokens, cookies, or other secrets.
 
 ## Upload Rules
 
@@ -60,8 +59,8 @@ Video:
 
 ## Security Boundaries
 
-- No real provider APIs are called.
+- Manual music/video providers do not call real provider APIs.
 - No cookies, session tokens, provider credentials, or API keys are stored.
 - Browser automation is intentionally not used.
-- Smart AI Singer sends only text context to OpenAI; uploaded audio/video files are not sent.
-- OpenAI API keys are read from environment variables and are not logged.
+- Smart AI Singer sends only text context to the selected LLM provider; uploaded audio/video files are not sent.
+- LLM API keys are read from environment variables and are not logged.

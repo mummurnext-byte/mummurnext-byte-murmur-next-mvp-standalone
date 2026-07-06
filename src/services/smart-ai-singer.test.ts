@@ -6,7 +6,7 @@ import { SmartAISingerService, type SmartAISingerRepository } from "./smart-ai-s
 import type { SmartAIOutput } from "./smart-ai-schemas";
 
 describe("smart ai singer", () => {
-  it("falls back to mock provider without OPENAI_API_KEY", () => {
+  it("falls back to mock provider without a configured provider key", () => {
     expect(getSmartLLMProvider({}).provider).toBe("mock");
   });
 
@@ -56,6 +56,29 @@ describe("smart ai singer", () => {
     });
   });
 
+  it("routes every Smart AI Singer generation through the configured provider", async () => {
+    const provider = new TrackingProvider();
+    const service = new SmartAISingerService(new MemorySmartAIRepository(), provider);
+
+    await service.generateSingerConcept("human-1");
+    await service.generateSongIdea("plan-1");
+    await service.generateLyrics("plan-1");
+    await service.generateMusicPrompt("plan-1", "suno_manual");
+    await service.generateVideoBrief("plan-1", "heygen_manual");
+    await service.generatePublishCopy("plan-1", "tiktok");
+    await service.suggestNextContent("human-1");
+
+    expect(provider.schemaNames).toEqual([
+      "singer_concept",
+      "song_idea",
+      "lyrics",
+      "music_prompt",
+      "video_brief",
+      "publish_copy",
+      "next_content"
+    ]);
+  });
+
   it("records failed generations when structured output is invalid", async () => {
     const repo = new MemorySmartAIRepository();
     const service = new SmartAISingerService(repo, new InvalidOutputProvider());
@@ -94,6 +117,22 @@ class FailingProvider implements LLMProvider {
 
   async generate<T extends SmartAIOutput>(): Promise<{ output: T; provider: string; model: string }> {
     throw new Error("provider unavailable");
+  }
+}
+
+class TrackingProvider implements LLMProvider {
+  readonly provider = "tracking";
+  readonly model = "tracking-model";
+  readonly schemaNames: string[] = [];
+
+  async generate<T extends SmartAIOutput>(request: SmartAIProviderRequest<T>) {
+    this.schemaNames.push(request.schema.name);
+
+    return {
+      output: request.schema.validate(request.fallbackOutput),
+      provider: this.provider,
+      model: this.model
+    };
   }
 }
 

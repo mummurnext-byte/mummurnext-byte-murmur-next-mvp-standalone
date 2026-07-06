@@ -14,3 +14,4 @@
 - Added Vercel deployment readiness docs, environment example, storage provider abstraction, and admin deployment checklist page.
 - Added Vercel Blob storage provider for durable production media uploads.
 - Added Smart AI Singer service with OpenAI SDK support, mock fallback, structured output validation, usage logging, and back-office controls.
+- Added multi-provider Smart AI Singer LLM selection for Mock, OpenAI, Gemini, Groq, and OpenRouter with mock fallback when keys are missing.
