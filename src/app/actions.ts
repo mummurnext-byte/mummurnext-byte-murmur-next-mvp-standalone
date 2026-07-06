@@ -208,6 +208,10 @@ export async function askSmartSingerAction(formData: FormData) {
   const service = new SmartAISingerService();
 
   await runSmartAIAction(async () => {
+    if (task === "song_idea") {
+      await service.generateSongIdea(contentPlanId);
+      return;
+    }
     if (task === "lyrics") {
       await service.generateLyrics(contentPlanId);
       return;

@@ -53,8 +53,8 @@ export default async function Home({
         <header>
           <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
           <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-            Standalone AI digital-human music content system. No Back Office modules, no real AI
-            provider API calls, no cookies or tokens.
+            Standalone AI digital-human music content system. Smart AI Singer can use a configured
+            LLM provider; music, video, and publishing providers remain manual.
           </p>
           <Link
             href="/admin/deployment-checklist"
@@ -418,6 +418,9 @@ function AskSmartSingerPanel({
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
       <div className="text-sm font-medium">Ask Smart Singer</div>
       <div className="mt-3 flex flex-wrap gap-2">
+        <SmartTaskButton contentPlanId={contentPlan.id} task="song_idea">
+          Generate Song Idea
+        </SmartTaskButton>
         <SmartTaskButton contentPlanId={contentPlan.id} task="lyrics">
           Generate Lyrics
         </SmartTaskButton>
