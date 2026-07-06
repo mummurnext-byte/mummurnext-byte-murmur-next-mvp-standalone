@@ -11,4 +11,5 @@
 - Added manual HeyGen, Akool, and D-ID video provider workflow.
 - Added music and video upload with local file metadata and playback.
 - Added manual TikTok, YouTube Shorts, and YouTube publish workflow with status history.
+- Added manual platform analytics entry and Dashboard summaries.
 - Added tests for provider selection, prompt generation, upload validation, and metadata.

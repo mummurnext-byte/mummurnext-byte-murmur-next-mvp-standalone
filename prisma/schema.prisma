@@ -181,6 +181,7 @@ model PublishRecord {
   deletedAt          DateTime?             @map("deleted_at") @db.Timestamptz(6)
   contentPlan        ContentPlan           @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
   histories          PublishRecordHistory[]
+  metrics            PlatformMetric[]
 
   @@index([contentPlanId])
   @@index([platform])
@@ -200,4 +201,28 @@ model PublishRecordHistory {
   @@index([publishRecordId])
   @@index([status])
   @@map("platform_post_histories")
+}
+
+model PlatformMetric {
+  id               String        @id @default(uuid()) @db.Uuid
+  publishRecordId  String        @map("publish_record_id") @db.Uuid
+  platform         TargetPlatform
+  date             DateTime      @db.Date
+  views            Int           @default(0)
+  likes            Int           @default(0)
+  comments         Int           @default(0)
+  shares           Int           @default(0)
+  watchTimeSeconds Int           @default(0) @map("watch_time_seconds")
+  revenue          Decimal       @default(0) @db.Decimal(18, 4)
+  currency         String        @default("USD")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  publishRecord    PublishRecord @relation(fields: [publishRecordId], references: [id], onDelete: Restrict)
+
+  @@unique([publishRecordId, date])
+  @@index([publishRecordId])
+  @@index([platform])
+  @@index([date])
+  @@map("platform_metrics")
 }

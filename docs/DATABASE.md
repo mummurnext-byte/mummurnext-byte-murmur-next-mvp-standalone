@@ -13,6 +13,7 @@ The database is PostgreSQL through Prisma.
 - `PublishAsset`: uploaded audio/video metadata linked to a content plan.
 - `PublishRecord`: manual platform publishing record.
 - `PublishRecordHistory`: status history for platform publishing.
+- `PlatformMetric`: manual daily performance metrics for a publish record.
 
 ## Status Flow
 
@@ -63,3 +64,22 @@ Publish records store manual publishing data:
 - failure reason
 
 Every publish status save creates a `PublishRecordHistory` entry. Marking a record as published also advances the parent `ContentPlan.status` to `published`.
+
+## Analytics
+
+`PlatformMetric` stores one manual metric row per Publish Record and date.
+
+Fields:
+
+- publish record
+- platform
+- date
+- views
+- likes
+- comments
+- shares
+- watch time seconds
+- revenue
+- currency
+
+The unique key is `publishRecordId + date`, so saving the same date again updates the daily metrics instead of creating a duplicate row.

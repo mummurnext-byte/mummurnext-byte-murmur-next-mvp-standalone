@@ -12,6 +12,8 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
 - Prepare manual publishing records for TikTok, YouTube Shorts, and YouTube.
+- Manually record TikTok and YouTube performance metrics.
+- Review Dashboard totals and top performers by content plan, digital human, and platform.
 
 No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
 
@@ -126,6 +128,23 @@ This workflow does not call video provider APIs, automate login, or store cookie
 7. Review publish history entries on the Content Plan.
 
 This workflow does not call TikTok or YouTube APIs, automate posting, or store platform accounts.
+
+## Manual Analytics Workflow
+
+1. Create or update a Publish Record for a Content Plan.
+2. Open the Content Plan and find the Publish Record.
+3. Enter daily metrics:
+   - views
+   - likes
+   - comments
+   - shares
+   - watch time seconds
+   - revenue
+   - currency
+4. Save the metrics. Saving the same Publish Record and date again edits that daily row.
+5. Use the Dashboard filters to compare performance by date range, platform, and Digital Human.
+
+The analytics workflow is manual only. It does not call TikTok or YouTube APIs and does not store platform accounts.
 
 ## Future Integrations
 

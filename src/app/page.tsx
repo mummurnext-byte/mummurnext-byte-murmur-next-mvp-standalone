@@ -7,6 +7,7 @@ import {
   generateWeeklyPlanAction,
   markPublishRecordPublishedAction,
   savePublishRecordAction,
+  savePlatformMetricAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -15,6 +16,7 @@ import {
 } from "@/app/actions";
 import { CopyFields } from "@/components/copy-fields";
 import { prisma } from "@/lib/prisma";
+import { summarizeMetrics, type AnalyticsFilters, type AnalyticsMetricRow } from "@/services/analytics";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { defaultPublishCopy, publishPlatforms, publishStatuses } from "@/services/publish-workflow";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
@@ -40,18 +42,19 @@ export default async function Home({
     planId?: string;
     musicProvider?: string;
     videoProvider?: string;
+    from?: string;
+    to?: string;
+    platform?: string;
+    digitalHumanFilter?: string;
   }>;
 }) {
   const params = await searchParams;
-  const [digitalHumans, contentPlans, publishStats, selectedHuman, selectedPlan] = await Promise.all([
-    prisma.digitalHuman.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      include: { persona: true, consentRecords: { where: { deletedAt: null }, take: 5 } }
-    }),
+  const analyticsFilters = analyticsFiltersFromParams(params);
+  const [digitalHumans, contentPlans, publishStats, analytics, selectedHuman, selectedPlan] = await Promise.all([
+    loadDigitalHumans(),
     loadContentPlans(),
     loadPublishStats(),
+    loadAnalytics(analyticsFilters),
     params?.digitalHumanId ? loadSelectedHuman(params.digitalHumanId) : null,
     params?.planId ? loadSelectedPlan(params.planId) : null
   ]);
@@ -68,6 +71,7 @@ export default async function Home({
         </header>
 
         <PublishStatsPanel stats={publishStats} />
+        <AnalyticsDashboardPanel analytics={analytics} digitalHumans={digitalHumans} filters={analyticsFilters} />
 
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <section className="space-y-4">
@@ -133,6 +137,15 @@ export default async function Home({
   );
 }
 
+async function loadDigitalHumans() {
+  return prisma.digitalHuman.findMany({
+    where: { deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: { persona: true, consentRecords: { where: { deletedAt: null }, take: 5 } }
+  });
+}
+
 async function loadSelectedHuman(id: string) {
   if (!isUuid(id)) return null;
   return prisma.digitalHuman.findFirst({
@@ -160,6 +173,11 @@ async function loadSelectedPlan(id: string) {
         where: { deletedAt: null },
         orderBy: [{ platform: "asc" }, { createdAt: "desc" }],
         include: {
+          metrics: {
+            where: { deletedAt: null },
+            orderBy: { date: "desc" },
+            take: 30
+          },
           histories: {
             orderBy: { createdAt: "desc" },
             take: 10
@@ -195,6 +213,62 @@ async function loadPublishStats() {
   };
 }
 
+async function loadAnalytics(filters: AnalyticsFilters) {
+  const metrics = await prisma.platformMetric.findMany({
+    where: {
+      deletedAt: null,
+      platform: filters.platform ?? undefined,
+      date: {
+        gte: filters.from ? dateOnly(filters.from) : undefined,
+        lte: filters.to ? dateOnly(filters.to) : undefined
+      },
+      publishRecord: {
+        deletedAt: null,
+        contentPlan: {
+          deletedAt: null,
+          digitalHumanId: filters.digitalHumanId ?? undefined,
+          digitalHuman: { deletedAt: null }
+        }
+      }
+    },
+    orderBy: { date: "desc" },
+    take: 1000,
+    include: {
+      publishRecord: {
+        include: {
+          contentPlan: {
+            include: {
+              digitalHuman: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const rows: AnalyticsMetricRow[] = metrics.map((metric) => ({
+    date: metric.date,
+    platform: metric.platform,
+    views: metric.views,
+    likes: metric.likes,
+    comments: metric.comments,
+    shares: metric.shares,
+    watchTimeSeconds: metric.watchTimeSeconds,
+    revenue: Number(metric.revenue),
+    currency: metric.currency,
+    publishRecordId: metric.publishRecordId,
+    contentPlanId: metric.publishRecord.contentPlanId,
+    contentPlanTitle: metric.publishRecord.contentPlan.title,
+    digitalHumanId: metric.publishRecord.contentPlan.digitalHumanId,
+    digitalHumanName: metric.publishRecord.contentPlan.digitalHuman.displayName
+  }));
+
+  return {
+    rows,
+    summary: summarizeMetrics(rows)
+  };
+}
+
 function PublishStatsPanel({ stats }: { stats: Awaited<ReturnType<typeof loadPublishStats>> }) {
   return (
     <section className="grid gap-3 sm:grid-cols-5">
@@ -207,11 +281,106 @@ function PublishStatsPanel({ stats }: { stats: Awaited<ReturnType<typeof loadPub
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function AnalyticsDashboardPanel({
+  analytics,
+  digitalHumans,
+  filters
+}: {
+  analytics: Awaited<ReturnType<typeof loadAnalytics>>;
+  digitalHumans: Awaited<ReturnType<typeof loadDigitalHumans>>;
+  filters: AnalyticsFilters;
+}) {
+  const summary = analytics.summary;
+  const hasMetrics = analytics.rows.length > 0;
+
+  return (
+    <Panel title="Analytics Dashboard">
+      <form action="/" className="mb-4 grid gap-3 md:grid-cols-4">
+        <Input label="From" name="from" type="date" defaultValue={filters.from ?? ""} />
+        <Input label="To" name="to" type="date" defaultValue={filters.to ?? ""} />
+        <Select label="Platform" name="platform" defaultValue={filters.platform ?? ""}>
+          <option value="">All platforms</option>
+          {publishPlatforms.map((platform) => (
+            <option key={platform} value={platform}>
+              {platformLabels[platform]}
+            </option>
+          ))}
+        </Select>
+        <Select label="Digital Human" name="digitalHumanFilter" defaultValue={filters.digitalHumanId ?? ""}>
+          <option value="">All digital humans</option>
+          {digitalHumans.map((human) => (
+            <option key={human.id} value={human.id}>
+              {human.displayName}
+            </option>
+          ))}
+        </Select>
+        <div className="md:col-span-4">
+          <Submit>Apply Filters</Submit>
+        </div>
+      </form>
+
+      {!hasMetrics ? (
+        <p className="text-sm text-zinc-400">No platform metrics yet. Add daily metrics from a Publish Record.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <Metric label="Views" value={formatNumber(summary.totals.views)} />
+            <Metric label="Likes" value={formatNumber(summary.totals.likes)} />
+            <Metric label="Comments" value={formatNumber(summary.totals.comments)} />
+            <Metric label="Shares" value={formatNumber(summary.totals.shares)} />
+            <Metric label="Watch Time" value={formatDuration(summary.totals.watchTimeSeconds)} />
+            <Metric label="Revenue" value={formatCurrency(summary.totals.revenue)} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Ranking title="Top 10 Content Plans by Views" rows={summary.topContentPlansByViews} valueKey="views" />
+            <Ranking title="Top 10 Content Plans by Revenue" rows={summary.topContentPlansByRevenue} valueKey="revenue" />
+            <Ranking title="Top Digital Humans by Views" rows={summary.topDigitalHumansByViews} valueKey="views" />
+            <Ranking title="Top Platforms by Revenue" rows={summary.topPlatformsByRevenue} valueKey="revenue" />
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
       <div className="text-xs uppercase text-zinc-500">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function Ranking({
+  title,
+  rows,
+  valueKey
+}: {
+  title: string;
+  rows: { id: string; label: string; views: number; revenue: number }[];
+  valueKey: "views" | "revenue";
+}) {
+  return (
+    <div className="rounded-md border border-zinc-800 p-3">
+      <div className="text-sm font-medium">{title}</div>
+      {rows.length === 0 ? (
+        <p className="mt-2 text-sm text-zinc-400">No data.</p>
+      ) : (
+        <ol className="mt-3 space-y-2 text-sm">
+          {rows.map((row, index) => (
+            <li key={row.id} className="flex items-center justify-between gap-3">
+              <span className="truncate text-zinc-300">
+                {index + 1}. {row.label}
+              </span>
+              <span className="shrink-0 text-zinc-500">
+                {valueKey === "views" ? formatNumber(row.views) : formatCurrency(row.revenue)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
@@ -481,6 +650,8 @@ function PublishWorkflowPanel({
                     <Submit>Mark Published</Submit>
                   </form>
 
+                  <PlatformMetricsPanel publishRecord={record} />
+
                   {record.histories.length === 0 ? (
                     <p className="text-xs text-zinc-500">No history entries yet.</p>
                   ) : (
@@ -500,6 +671,86 @@ function PublishWorkflowPanel({
         </>
       )}
     </div>
+  );
+}
+
+function PlatformMetricsPanel({
+  publishRecord
+}: {
+  publishRecord: NonNullable<SelectedPlan>["publishRecords"][number];
+}) {
+  return (
+    <div className="space-y-3 rounded border border-zinc-800 p-3">
+      <div>
+        <div className="text-sm font-medium">Daily Metrics</div>
+        <p className="mt-1 text-xs text-zinc-500">Manual analytics entry. No platform APIs are called.</p>
+      </div>
+
+      <PlatformMetricForm publishRecordId={publishRecord.id} submitLabel="Save Daily Metrics" />
+
+      {publishRecord.metrics.length === 0 ? (
+        <p className="text-sm text-zinc-400">No metrics recorded yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {publishRecord.metrics.map((metric) => (
+            <PlatformMetricForm
+              key={metric.id}
+              publishRecordId={publishRecord.id}
+              date={formatDateInput(metric.date)}
+              views={metric.views}
+              likes={metric.likes}
+              comments={metric.comments}
+              shares={metric.shares}
+              watchTimeSeconds={metric.watchTimeSeconds}
+              revenue={Number(metric.revenue)}
+              currency={metric.currency}
+              submitLabel={`Update ${formatDate(metric.date)}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlatformMetricForm({
+  publishRecordId,
+  date,
+  views = 0,
+  likes = 0,
+  comments = 0,
+  shares = 0,
+  watchTimeSeconds = 0,
+  revenue = 0,
+  currency = "USD",
+  submitLabel
+}: {
+  publishRecordId: string;
+  date?: string;
+  views?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  watchTimeSeconds?: number;
+  revenue?: number;
+  currency?: string;
+  submitLabel: string;
+}) {
+  return (
+    <form action={savePlatformMetricAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+      <input type="hidden" name="publishRecordId" value={publishRecordId} />
+      <Input label="Date" name="date" type="date" defaultValue={date ?? todayInput()} required />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input label="Views" name="views" type="number" min="0" defaultValue={views} required />
+        <Input label="Likes" name="likes" type="number" min="0" defaultValue={likes} required />
+        <Input label="Comments" name="comments" type="number" min="0" defaultValue={comments} required />
+        <Input label="Shares" name="shares" type="number" min="0" defaultValue={shares} required />
+        <Input label="Watch time seconds" name="watchTimeSeconds" type="number" min="0" defaultValue={watchTimeSeconds} required />
+        <Input label="Revenue" name="revenue" type="number" min="0" step="0.0001" defaultValue={revenue} required />
+      </div>
+      <Input label="Currency" name="currency" defaultValue={currency} required />
+      <Submit>{submitLabel}</Submit>
+    </form>
   );
 }
 
@@ -746,6 +997,59 @@ function formatDateTime(date: Date) {
 
 function formatDateTimeInput(date: Date) {
   return date.toISOString().slice(0, 16);
+}
+
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function todayInput() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function analyticsFiltersFromParams(params?: {
+  from?: string;
+  to?: string;
+  platform?: string;
+  digitalHumanFilter?: string;
+}): AnalyticsFilters {
+  return {
+    from: isDateInput(params?.from) ? params?.from : null,
+    to: isDateInput(params?.to) ? params?.to : null,
+    platform: params?.platform && isTargetPlatform(params.platform) ? params.platform : null,
+    digitalHumanId: params?.digitalHumanFilter && isUuid(params.digitalHumanFilter) ? params.digitalHumanFilter : null
+  };
+}
+
+function dateOnly(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function isDateInput(value?: string) {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(dateOnly(value).getTime()));
+}
+
+function isTargetPlatform(value: string): value is TargetPlatform {
+  return publishPlatforms.includes(value as TargetPlatform);
 }
 
 function isUuid(value: string) {

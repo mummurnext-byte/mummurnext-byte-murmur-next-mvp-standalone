@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { storeUploadedFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
+import { normalizeMetricInput } from "@/services/analytics";
 import {
   assertMusicFile,
   assertVideoFile,
@@ -301,6 +302,65 @@ export async function markPublishRecordPublishedAction(formData: FormData) {
       data: { status: "published" }
     })
   ]);
+
+  revalidatePath("/");
+}
+
+export async function savePlatformMetricAction(formData: FormData) {
+  const publishRecordId = requiredString(formData, "publishRecordId");
+  const publishRecord = await prisma.publishRecord.findFirst({
+    where: {
+      id: publishRecordId,
+      deletedAt: null,
+      contentPlan: { deletedAt: null, digitalHuman: { deletedAt: null } }
+    },
+    select: { id: true, platform: true }
+  });
+
+  if (!publishRecord) throw new Error("Publish record was not found or is archived.");
+
+  const metric = normalizeMetricInput({
+    date: requiredString(formData, "date"),
+    platform: publishRecord.platform,
+    views: requiredString(formData, "views"),
+    likes: requiredString(formData, "likes"),
+    comments: requiredString(formData, "comments"),
+    shares: requiredString(formData, "shares"),
+    watchTimeSeconds: requiredString(formData, "watchTimeSeconds"),
+    revenue: requiredString(formData, "revenue"),
+    currency: optionalString(formData, "currency")
+  });
+
+  await prisma.platformMetric.upsert({
+    where: {
+      publishRecordId_date: {
+        publishRecordId,
+        date: metric.date
+      }
+    },
+    create: {
+      publishRecordId,
+      platform: metric.platform,
+      date: metric.date,
+      views: metric.views,
+      likes: metric.likes,
+      comments: metric.comments,
+      shares: metric.shares,
+      watchTimeSeconds: metric.watchTimeSeconds,
+      revenue: metric.revenue,
+      currency: metric.currency
+    },
+    update: {
+      platform: metric.platform,
+      views: metric.views,
+      likes: metric.likes,
+      comments: metric.comments,
+      shares: metric.shares,
+      watchTimeSeconds: metric.watchTimeSeconds,
+      revenue: metric.revenue,
+      currency: metric.currency
+    }
+  });
 
   revalidatePath("/");
 }
