@@ -105,6 +105,7 @@ export class GeminiProvider implements LLMProvider {
   async generate<T extends SmartAIOutput>(
     request: SmartAIProviderRequest<T>
   ): Promise<SmartAIProviderResult<T>> {
+    const geminiSchema = toGeminiSchema(request.schema.jsonSchema) as Record<string, unknown>;
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`,
       {
@@ -117,19 +118,21 @@ export class GeminiProvider implements LLMProvider {
           contents: [
             {
               role: "user",
-              parts: [{ text: providerPrompt(request) }]
+              parts: [{ text: providerPrompt(request, geminiSchema) }]
             }
           ],
           generationConfig: {
             responseMimeType: "application/json",
-            responseSchema: request.schema.jsonSchema
+            responseSchema: geminiSchema
           }
         })
       }
     );
 
     if (!response.ok) {
-      throw new Error(`Gemini request failed with status ${response.status}.`);
+      const errorBody = await response.text().catch(() => "");
+      const detail = errorBody ? ` ${errorBody.slice(0, 500)}` : "";
+      throw new Error(`Gemini request failed with status ${response.status}.${detail}`);
     }
 
     const body = await response.json();
@@ -230,12 +233,12 @@ export function getSmartLLMProvider(source: EnvSource = process.env): LLMProvide
   return createLLMProvider(source);
 }
 
-function providerPrompt<T extends SmartAIOutput>(request: SmartAIProviderRequest<T>) {
+function providerPrompt<T extends SmartAIOutput>(request: SmartAIProviderRequest<T>, jsonSchema: unknown = request.schema.jsonSchema) {
   return [
     request.userPrompt,
     "",
     `Return only a JSON object that matches this schema named ${request.schema.name}:`,
-    JSON.stringify(request.schema.jsonSchema)
+    JSON.stringify(jsonSchema)
   ].join("\n");
 }
 
@@ -333,4 +336,20 @@ function readNumber(value: unknown) {
 
 function modelOrDefault(model: string, fallback: string) {
   return model.trim() || fallback;
+}
+
+function toGeminiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(toGeminiSchema);
+  }
+
+  if (!schema || typeof schema !== "object") {
+    return schema;
+  }
+
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([key]) => key !== "additionalProperties" && key !== "$schema")
+      .map(([key, value]) => [key, toGeminiSchema(value)])
+  );
 }

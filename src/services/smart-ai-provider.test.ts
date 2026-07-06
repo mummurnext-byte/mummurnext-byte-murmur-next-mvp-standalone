@@ -104,5 +104,6 @@ describe("smart ai provider factory", () => {
     const [url, init] = calls[0];
     expect(String(url)).not.toContain("gemini-secret");
     expect(init.headers).toMatchObject({ "x-goog-api-key": "gemini-secret" });
+    expect(init.body).not.toContain("additionalProperties");
   });
 });
