@@ -64,8 +64,12 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | Variable | Required | Example | Notes |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/mummur_next_mvp?schema=public` | PostgreSQL connection string used by Prisma. |
-| `OPENAI_API_KEY` | No | empty | Optional. Leave empty to use mock Smart AI Singer generation. |
-| `OPENAI_MODEL` | No | `gpt-5.5` | OpenAI model used by Smart AI Singer when `OPENAI_API_KEY` is configured. |
+| `LLM_PROVIDER` | No | `mock` | Smart AI Singer provider: `mock`, `openai`, `gemini`, `groq`, or `openrouter`. |
+| `LLM_MODEL` | No | `gemini-1.5-flash` | Model name for the selected LLM provider. Leave empty to use the provider default. |
+| `OPENAI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openai`. |
+| `GEMINI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=gemini`. |
+| `GROQ_API_KEY` | No | empty | Required only when `LLM_PROVIDER=groq`. |
+| `OPENROUTER_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openrouter`. |
 | `SMART_AI_DAILY_LIMIT` | No | `20` | Maximum Smart AI Singer generations per day. |
 | `APP_BASE_URL` | Yes | `http://localhost:3000` | Public base URL for the app. |
 | `STORAGE_PROVIDER` | Yes | `local` | Use `local` for development or `vercel_blob` for Vercel media uploads. |
@@ -83,8 +87,9 @@ production PostgreSQL database is available.
    another managed Postgres service.
 2. Add environment variables in Vercel:
    - `DATABASE_URL`
-   - `OPENAI_API_KEY` (optional; leave empty to use mock generation)
-   - `OPENAI_MODEL`
+   - `LLM_PROVIDER`
+   - `LLM_MODEL`
+   - the matching provider key: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`
    - `SMART_AI_DAILY_LIMIT`
    - `STORAGE_PROVIDER` (`vercel_blob` for production uploads)
    - `BLOB_READ_WRITE_TOKEN` (required when `STORAGE_PROVIDER=vercel_blob`)
@@ -183,9 +188,25 @@ It can generate:
 - TikTok / YouTube publishing copy
 - next content suggestions
 
-Configure `OPENAI_API_KEY` in Vercel or `.env` to use OpenAI. If
-`OPENAI_API_KEY` is empty, Smart AI Singer automatically uses
-`MockLLMProvider`, so local development works without paid API calls.
+Smart AI Singer uses a single `LLMProvider` interface. Select the provider with
+`LLM_PROVIDER`:
+
+- `mock`: local deterministic output, no API calls.
+- `openai`: OpenAI SDK using `OPENAI_API_KEY`.
+- `gemini`: Google Gemini REST API using `GEMINI_API_KEY`.
+- `groq`: Groq OpenAI-compatible API using `GROQ_API_KEY`.
+- `openrouter`: OpenRouter OpenAI-compatible API using `OPENROUTER_API_KEY`.
+
+Recommended low-cost local configuration:
+
+```env
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-1.5-flash
+SMART_AI_DAILY_LIMIT=20
+```
+
+If the selected provider key is missing, Smart AI Singer automatically falls
+back to `MockLLMProvider`, so local development works without paid API calls.
 
 All model outputs are validated against local schemas before being saved. Failed
 generations are recorded with an error status instead of crashing the page.
@@ -195,7 +216,9 @@ Cost control:
 - `SMART_AI_DAILY_LIMIT` limits daily generations.
 - Each generation records purpose, provider, model, status, token usage when the
   SDK returns it, and estimated cost.
-- Uploaded audio/video files are not sent to OpenAI.
+- Uploaded audio/video files are not sent to any LLM provider.
+- API keys are read from environment variables and are never displayed in the
+  deployment checklist or written to logs.
 
 ## Manual Video Workflow
 

@@ -1,4 +1,5 @@
 export type StorageProviderKey = "local" | "s3" | "r2" | "vercel_blob";
+export type LLMProviderKey = "mock" | "openai" | "gemini" | "groq" | "openrouter";
 
 export type DeploymentCheck = {
   label: string;
@@ -10,12 +11,18 @@ export type EnvSource = Partial<Record<string, string | undefined>>;
 
 export function getEnv(source: EnvSource = process.env) {
   const maxUploadBytes = Number(source.MAX_UPLOAD_BYTES ?? 104857600);
+  const llmProvider = source.LLM_PROVIDER ? parseLLMProvider(source.LLM_PROVIDER) : source.OPENAI_API_KEY ? "openai" : "mock";
 
   return {
     appBaseUrl: source.APP_BASE_URL ?? "http://localhost:3000",
     databaseUrl: source.DATABASE_URL ?? "",
+    llmProvider,
+    llmModel: source.LLM_MODEL ?? source.OPENAI_MODEL ?? "",
     openaiApiKey: source.OPENAI_API_KEY ?? "",
-    openaiModel: source.OPENAI_MODEL ?? "gpt-5.5",
+    openaiModel: source.OPENAI_MODEL ?? source.LLM_MODEL ?? "gpt-5.5",
+    geminiApiKey: source.GEMINI_API_KEY ?? "",
+    groqApiKey: source.GROQ_API_KEY ?? "",
+    openrouterApiKey: source.OPENROUTER_API_KEY ?? "",
     blobReadWriteToken: source.BLOB_READ_WRITE_TOKEN ?? "",
     storageProvider: parseStorageProvider(source.STORAGE_PROVIDER),
     localFileStorageDir: source.LOCAL_FILE_STORAGE_DIR ?? "./uploads",
@@ -44,7 +51,7 @@ export function validateDeploymentEnv(source: EnvSource = process.env): Deployme
     {
       label: "LLM provider configured",
       ok: true,
-      detail: env.openaiApiKey ? "OpenAI key is configured." : "OpenAI key missing; app will use mock text generation."
+      detail: llmProviderDetail(env)
     },
     {
       label: "App base URL",
@@ -69,6 +76,11 @@ export function parseStorageProvider(value?: string): StorageProviderKey {
   return "local";
 }
 
+export function parseLLMProvider(value?: string): LLMProviderKey {
+  if (value === "openai" || value === "gemini" || value === "groq" || value === "openrouter") return value;
+  return "mock";
+}
+
 function parsePositiveInt(value: string | undefined, fallback: number) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -86,4 +98,20 @@ function storageProviderDetail(env: ReturnType<typeof getEnv>) {
   }
 
   return `${env.storageProvider} is selected but not implemented in this MVP.`;
+}
+
+function llmProviderDetail(env: ReturnType<typeof getEnv>) {
+  if (env.llmProvider === "mock") {
+    return "Using MockLLMProvider for local or free development.";
+  }
+
+  const keyConfigured =
+    (env.llmProvider === "openai" && Boolean(env.openaiApiKey)) ||
+    (env.llmProvider === "gemini" && Boolean(env.geminiApiKey)) ||
+    (env.llmProvider === "groq" && Boolean(env.groqApiKey)) ||
+    (env.llmProvider === "openrouter" && Boolean(env.openrouterApiKey));
+
+  return keyConfigured
+    ? `${env.llmProvider} key is configured.`
+    : `${env.llmProvider} selected but API key is missing; app will use mock text generation.`;
 }
