@@ -10,4 +10,5 @@
 - Added manual Suno and MakeBestMusic music provider workflow.
 - Added manual HeyGen, Akool, and D-ID video provider workflow.
 - Added music and video upload with local file metadata and playback.
+- Added Workflow Engine state tracking, Dashboard, Timeline, Retry, Cancel, and event log.
 - Added tests for provider selection, prompt generation, upload validation, and metadata.

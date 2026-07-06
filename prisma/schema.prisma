@@ -35,6 +35,26 @@ enum PublishStatus {
   failed
 }
 
+enum WorkflowState {
+  draft
+  planning
+  music_pending
+  music_ready
+  video_pending
+  video_ready
+  publish_ready
+  scheduled
+  published
+  failed
+}
+
+enum WorkflowStepKey {
+  planning
+  music
+  video
+  publish
+}
+
 model DigitalHuman {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String          @map("display_name")
@@ -121,6 +141,7 @@ model ContentPlan {
   songIdea       SongIdea        @relation(fields: [songIdeaId], references: [id], onDelete: Restrict)
   publishAssets  PublishAsset[]
   platformPosts  PlatformPost[]
+  workflowRuns   WorkflowRun[]
 
   @@index([digitalHumanId])
   @@index([songIdeaId])
@@ -181,4 +202,59 @@ model PlatformPost {
   @@index([platform])
   @@index([status])
   @@map("platform_posts")
+}
+
+model WorkflowRun {
+  id            String          @id @default(uuid()) @db.Uuid
+  contentPlanId String          @map("content_plan_id") @db.Uuid
+  currentState  WorkflowState   @default(draft) @map("current_state")
+  startedAt     DateTime?       @map("started_at") @db.Timestamptz(6)
+  finishedAt    DateTime?       @map("finished_at") @db.Timestamptz(6)
+  errorMessage  String?         @map("error_message")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?       @map("deleted_at") @db.Timestamptz(6)
+  contentPlan   ContentPlan     @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+  steps         WorkflowStep[]
+  events        WorkflowEvent[]
+
+  @@index([contentPlanId])
+  @@index([currentState])
+  @@map("workflow_runs")
+}
+
+model WorkflowStep {
+  id            String          @id @default(uuid()) @db.Uuid
+  workflowRunId String          @map("workflow_run_id") @db.Uuid
+  stepKey       WorkflowStepKey @map("step_key")
+  state         WorkflowState   @default(draft)
+  startedAt     DateTime?       @map("started_at") @db.Timestamptz(6)
+  finishedAt    DateTime?       @map("finished_at") @db.Timestamptz(6)
+  durationMs    Int?            @map("duration_ms")
+  errorMessage  String?         @map("error_message")
+  retryCount    Int             @default(0) @map("retry_count")
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workflowRun   WorkflowRun     @relation(fields: [workflowRunId], references: [id], onDelete: Restrict)
+
+  @@unique([workflowRunId, stepKey])
+  @@index([workflowRunId])
+  @@index([stepKey])
+  @@index([state])
+  @@map("workflow_steps")
+}
+
+model WorkflowEvent {
+  id            String      @id @default(uuid()) @db.Uuid
+  workflowRunId String      @map("workflow_run_id") @db.Uuid
+  eventType     String      @map("event_type")
+  actor         String
+  timestamp     DateTime    @default(now()) @db.Timestamptz(6)
+  payload       Json
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Restrict)
+
+  @@index([workflowRunId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@map("workflow_events")
 }

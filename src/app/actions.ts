@@ -15,6 +15,7 @@ import {
 import type { MusicProviderKey } from "@/services/music-provider";
 import { musicProviders } from "@/services/music-provider";
 import { generateWeeklyPlan } from "@/services/weekly-plan";
+import { WorkflowService } from "@/services/workflow-engine";
 import type { VideoProviderKey } from "@/services/video-provider";
 import { videoProviders } from "@/services/video-provider";
 
@@ -195,6 +196,26 @@ export async function uploadVideoAssetAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function startWorkflowAction(formData: FormData) {
+  await workflowService().startWorkflow(requiredString(formData, "contentPlanId"));
+  revalidatePath("/");
+}
+
+export async function nextWorkflowStepAction(formData: FormData) {
+  await workflowService().nextStep(requiredString(formData, "workflowRunId"));
+  revalidatePath("/");
+}
+
+export async function retryWorkflowStepAction(formData: FormData) {
+  await workflowService().retryStep(requiredString(formData, "workflowRunId"));
+  revalidatePath("/");
+}
+
+export async function cancelWorkflowAction(formData: FormData) {
+  await workflowService().cancelWorkflow(requiredString(formData, "workflowRunId"));
+  revalidatePath("/");
+}
+
 async function requireActiveDigitalHuman(id: string) {
   const digitalHuman = await prisma.digitalHuman.findFirst({
     where: { id, deletedAt: null },
@@ -258,6 +279,10 @@ function isMusicProvider(value: string): value is MusicProviderKey {
 
 function isVideoProvider(value: string): value is VideoProviderKey {
   return videoProviders.some((provider) => provider.providerKey === value);
+}
+
+function workflowService() {
+  return new WorkflowService(prisma);
 }
 
 function nextMusicUploadStatus(status: ContentStatus): ContentStatus {
