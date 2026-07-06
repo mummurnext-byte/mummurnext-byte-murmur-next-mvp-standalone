@@ -6,7 +6,9 @@ import {
   createDigitalHumanAction,
   generateWeeklyPlanAction,
   markPlatformPostPublishedAction,
+  retryMusicApiJobAction,
   savePlatformPostAction,
+  startMusicApiJobAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -16,6 +18,7 @@ import {
 import { CopyFields } from "@/components/copy-fields";
 import { prisma } from "@/lib/prisma";
 import { llmProviderOptions } from "@/services/llm-provider";
+import { isRetryableMusicApiStatus, musicApiProviders } from "@/services/music-api-provider";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { defaultPublishCopy, publishPlatforms, publishStatuses } from "@/services/publish-workflow";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
@@ -166,6 +169,11 @@ async function loadSelectedPlan(id: string) {
             take: 10
           }
         }
+      },
+      musicGenerationJobs: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 20
       }
     }
   });
@@ -403,6 +411,8 @@ function SelectedPlanPanel({
             <Submit>Upload Music</Submit>
           </form>
 
+          <MusicApiJobsPanel contentPlan={contentPlan} />
+
           <form action={uploadVideoAssetAction} className="grid gap-3 rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="contentPlanId" value={contentPlan.id} />
             <input type="hidden" name="provider" value={videoProvider.providerKey} />
@@ -417,6 +427,61 @@ function SelectedPlanPanel({
         </aside>
       </div>
     </Panel>
+  );
+}
+
+function MusicApiJobsPanel({ contentPlan }: { contentPlan: NonNullable<SelectedPlan> }) {
+  return (
+    <div className="space-y-3 rounded-md border border-zinc-800 p-3">
+      <div>
+        <div className="text-sm font-medium">Music API Provider</div>
+        <p className="mt-1 text-xs text-zinc-500">Official API or mock API only. No cookies or browser login.</p>
+      </div>
+
+      <form action={startMusicApiJobAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+        <input type="hidden" name="contentPlanId" value={contentPlan.id} />
+        <Select label="API provider" name="provider" defaultValue={musicApiProviders[0].providerKey}>
+          {musicApiProviders.map((provider) => (
+            <option key={provider.providerKey} value={provider.providerKey}>
+              {provider.providerName}
+            </option>
+          ))}
+        </Select>
+        <Submit>Generate Music via API</Submit>
+      </form>
+
+      {contentPlan.musicGenerationJobs.length === 0 ? (
+        <p className="text-sm text-zinc-400">No music API jobs yet.</p>
+      ) : (
+        <div className="grid gap-3">
+          {contentPlan.musicGenerationJobs.map((job) => (
+            <div key={job.id} className="rounded border border-zinc-800 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium">{job.provider}</div>
+                  <div className="text-xs text-zinc-500">Status: {job.status}</div>
+                </div>
+                {job.generatedAudioUrl ? (
+                  <a className="text-xs text-zinc-300 underline" href={job.generatedAudioUrl}>
+                    generatedAudioUrl
+                  </a>
+                ) : null}
+              </div>
+              {job.errorMessage ? <p className="mt-2 text-xs text-red-300">{job.errorMessage}</p> : null}
+              <div className="mt-2 text-xs text-zinc-500">
+                Provider config: {compactJson(job.providerConfig)}
+              </div>
+              {isRetryableMusicApiStatus(job.status) ? (
+                <form action={retryMusicApiJobAction} className="mt-3">
+                  <input type="hidden" name="id" value={job.id} />
+                  <Submit>Retry</Submit>
+                </form>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -654,7 +719,7 @@ function AssetList({
         <div className="mt-3 grid gap-3">
           {assets.map((asset) => {
             const metadata = assetMetadata(asset.metadata);
-            const src = `/api/assets/${asset.id}`;
+            const src = asset.assetUrl.startsWith("http") ? asset.assetUrl : `/api/assets/${asset.id}`;
             return (
               <div key={asset.id} className="rounded border border-zinc-800 p-3">
                 <div className="text-sm">{metadata.originalName ?? asset.assetUrl}</div>
@@ -728,6 +793,11 @@ function Submit({ children }: { children: React.ReactNode }) {
 function assetMetadata(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return {};
   return metadata as { originalName?: string };
+}
+
+function compactJson(value: unknown) {
+  if (!value || typeof value !== "object") return "not configured";
+  return JSON.stringify(value);
 }
 
 function formatDate(date: Date) {

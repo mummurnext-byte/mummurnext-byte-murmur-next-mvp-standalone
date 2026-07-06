@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { storeUploadedFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
 import { isLLMProviderKey } from "@/services/llm-provider";
+import { getMusicApiProvider, isMusicApiProviderKey } from "@/services/music-api-provider";
+import type { MusicApiJobResult } from "@/services/music-api-provider";
 import {
   assertMusicFile,
   assertVideoFile,
@@ -169,6 +171,58 @@ export async function uploadMusicAssetAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function startMusicApiJobAction(formData: FormData) {
+  const contentPlanId = requiredString(formData, "contentPlanId");
+  const providerKey = requiredString(formData, "provider");
+
+  if (!isMusicApiProviderKey(providerKey)) throw new Error("Music API provider is not supported.");
+
+  const contentPlan = await requireMusicApiContentPlan(contentPlanId);
+  const provider = getMusicApiProvider(providerKey);
+  const result = await provider.createJob({ contentPlan });
+
+  await createMusicApiJobResult({
+    contentPlanId,
+    providerKey,
+    result,
+    previousContentStatus: contentPlan.status
+  });
+
+  revalidatePath("/");
+}
+
+export async function retryMusicApiJobAction(formData: FormData) {
+  const id = requiredString(formData, "id");
+  const previousJob = await prisma.musicGenerationJob.findFirst({
+    where: { id, deletedAt: null, contentPlan: { deletedAt: null, digitalHuman: { deletedAt: null } } },
+    include: {
+      contentPlan: {
+        include: {
+          digitalHuman: { include: { persona: true } },
+          songIdea: true
+        }
+      }
+    }
+  });
+
+  if (!previousJob) throw new Error("Music API job was not found or is archived.");
+  if (previousJob.status !== "failed") throw new Error("Only failed music API jobs can be retried.");
+  if (!isMusicApiProviderKey(previousJob.provider)) throw new Error("Music API provider is not supported.");
+
+  const provider = getMusicApiProvider(previousJob.provider);
+  const result = await provider.retryJob({ contentPlan: previousJob.contentPlan });
+
+  await createMusicApiJobResult({
+    contentPlanId: previousJob.contentPlanId,
+    providerKey: previousJob.provider,
+    result,
+    retryOfJobId: previousJob.id,
+    previousContentStatus: previousJob.contentPlan.status
+  });
+
+  revalidatePath("/");
+}
+
 export async function uploadVideoAssetAction(formData: FormData) {
   const contentPlanId = requiredString(formData, "contentPlanId");
   const contentPlan = await requireActiveContentPlan(contentPlanId);
@@ -319,6 +373,74 @@ async function requireActiveContentPlan(id: string) {
 
   if (!contentPlan) throw new Error("Content plan was not found or is archived.");
   return contentPlan;
+}
+
+async function requireMusicApiContentPlan(id: string) {
+  const contentPlan = await prisma.contentPlan.findFirst({
+    where: { id, deletedAt: null, digitalHuman: { deletedAt: null } },
+    include: {
+      digitalHuman: { include: { persona: true } },
+      songIdea: true
+    }
+  });
+
+  if (!contentPlan) throw new Error("Content plan was not found or is archived.");
+  return contentPlan;
+}
+
+async function createMusicApiJobResult({
+  contentPlanId,
+  providerKey,
+  result,
+  retryOfJobId,
+  previousContentStatus
+}: {
+  contentPlanId: string;
+  providerKey: string;
+  result: MusicApiJobResult;
+  retryOfJobId?: string;
+  previousContentStatus: ContentStatus;
+}) {
+  const completedAt = result.status === "completed" || result.status === "failed" ? new Date() : null;
+
+  await prisma.$transaction(async (tx) => {
+    const job = await tx.musicGenerationJob.create({
+      data: {
+        contentPlanId,
+        provider: providerKey,
+        status: result.status,
+        providerConfig: result.providerConfig,
+        requestPayload: result.requestPayload,
+        generatedAudioUrl: result.generatedAudioUrl,
+        errorMessage: result.errorMessage,
+        retryOfJobId,
+        startedAt: new Date(),
+        completedAt
+      }
+    });
+
+    if (result.status === "completed" && result.generatedAudioUrl) {
+      await tx.publishAsset.create({
+        data: {
+          contentPlanId,
+          assetType: "audio",
+          assetUrl: result.generatedAudioUrl,
+          provider: providerKey,
+          metadata: {
+            workflow: "music_api_generation",
+            musicApiJobId: job.id,
+            generatedAudioUrl: result.generatedAudioUrl,
+            providerConfig: result.providerConfig
+          }
+        }
+      });
+
+      await tx.contentPlan.update({
+        where: { id: contentPlanId },
+        data: { status: nextMusicUploadStatus(previousContentStatus) }
+      });
+    }
+  });
 }
 
 async function requireLatestMusicAsset(contentPlanId: string) {

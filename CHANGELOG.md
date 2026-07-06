@@ -13,3 +13,4 @@
 - Added manual TikTok, YouTube Shorts, and YouTube publish workflow with status history.
 - Added tests for provider selection, prompt generation, upload validation, and metadata.
 - Added configurable LLM providers for weekly plan generation with Mock fallback and OpenAI support.
+- Added mock Music API Provider workflow with generation jobs, generated audio URLs, and retry support.
