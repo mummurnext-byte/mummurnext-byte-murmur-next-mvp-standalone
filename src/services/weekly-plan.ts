@@ -73,7 +73,7 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
               caption: item.caption,
               hashtags: item.hashtags,
               targetPlatform: item.targetPlatform,
-              platformPosts: {
+              publishRecords: {
                 create: {
                   platform: item.targetPlatform
                 }

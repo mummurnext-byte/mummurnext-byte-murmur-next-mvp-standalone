@@ -15,6 +15,7 @@ import {
 import type { MusicProviderKey } from "@/services/music-provider";
 import { musicProviders } from "@/services/music-provider";
 import {
+  assertPublishStatusTransition,
   isPublishPlatform,
   isPublishStatus,
   scheduledAtFromInput,
@@ -201,7 +202,7 @@ export async function uploadVideoAssetAction(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function savePlatformPostAction(formData: FormData) {
+export async function savePublishRecordAction(formData: FormData) {
   const contentPlanId = requiredString(formData, "contentPlanId");
   const platform = requiredString(formData, "platform");
   const status = requiredString(formData, "status");
@@ -213,14 +214,20 @@ export async function savePlatformPostAction(formData: FormData) {
   const contentPlan = await requireActiveContentPlan(contentPlanId);
   await requireLatestVideoAsset(contentPlanId);
 
-  const publishTitle = requiredString(formData, "publishTitle");
-  const publishDescription = requiredString(formData, "publishDescription");
+  const title = requiredString(formData, "title");
+  const description = requiredString(formData, "description");
   const hashtags = splitPublishHashtags(requiredString(formData, "hashtags"));
   const scheduledAt = scheduledAtFromInput(status, optionalString(formData, "scheduledAt"));
-  const errorMessage = status === "failed" ? optionalString(formData, "errorMessage") : null;
+  const failureReason = status === "failed" ? optionalString(formData, "failureReason") : null;
+
+  assertPublishStatusTransition({
+    status,
+    hasVideo: true,
+    failureReason
+  });
 
   await prisma.$transaction(async (tx) => {
-    const platformPost = await tx.platformPost.upsert({
+    const publishRecord = await tx.publishRecord.upsert({
       where: {
         contentPlanId_platform: {
           contentPlanId,
@@ -231,25 +238,25 @@ export async function savePlatformPostAction(formData: FormData) {
         contentPlanId,
         platform,
         status,
-        publishTitle,
-        publishDescription,
+        title,
+        description,
         hashtags,
         scheduledAt,
-        errorMessage
+        failureReason
       },
       update: {
         status,
-        publishTitle,
-        publishDescription,
+        title,
+        description,
         hashtags,
         scheduledAt,
-        errorMessage
+        failureReason
       }
     });
 
-    await tx.platformPostHistory.create({
+    await tx.publishRecordHistory.create({
       data: {
-        platformPostId: platformPost.id,
+        publishRecordId: publishRecord.id,
         status,
         note: publishHistoryNote(status, contentPlan.status)
       }
@@ -259,38 +266,38 @@ export async function savePlatformPostAction(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function markPlatformPostPublishedAction(formData: FormData) {
+export async function markPublishRecordPublishedAction(formData: FormData) {
   const id = requiredString(formData, "id");
   const publishedUrl = requiredString(formData, "publishedUrl");
 
-  const platformPost = await prisma.platformPost.findFirst({
+  const publishRecord = await prisma.publishRecord.findFirst({
     where: { id, deletedAt: null, contentPlan: { deletedAt: null, digitalHuman: { deletedAt: null } } },
     select: { id: true, contentPlanId: true }
   });
 
-  if (!platformPost) throw new Error("Platform post was not found or is archived.");
-  await requireLatestVideoAsset(platformPost.contentPlanId);
+  if (!publishRecord) throw new Error("Publish record was not found or is archived.");
+  await requireLatestVideoAsset(publishRecord.contentPlanId);
+  assertPublishStatusTransition({ status: "published", hasVideo: true, publishedUrl });
 
   await prisma.$transaction([
-    prisma.platformPost.update({
+    prisma.publishRecord.update({
       where: { id },
       data: {
         status: "published",
         publishedUrl,
-        postUrl: publishedUrl,
         publishedAt: new Date(),
-        errorMessage: null
+        failureReason: null
       }
     }),
-    prisma.platformPostHistory.create({
+    prisma.publishRecordHistory.create({
       data: {
-        platformPostId: id,
+        publishRecordId: id,
         status: "published",
         note: "Manually marked as published."
       }
     }),
     prisma.contentPlan.update({
-      where: { id: platformPost.contentPlanId },
+      where: { id: publishRecord.contentPlanId },
       data: { status: "published" }
     })
   ]);

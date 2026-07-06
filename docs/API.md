@@ -12,8 +12,8 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `updateContentPlanStatusAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
-- `savePlatformPostAction`
-- `markPlatformPostPublishedAction`
+- `savePublishRecordAction`
+- `markPublishRecordPublishedAction`
 
 ## Media Route
 
