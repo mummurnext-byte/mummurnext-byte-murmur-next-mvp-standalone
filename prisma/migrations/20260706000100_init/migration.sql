@@ -4,7 +4,7 @@ CREATE TYPE "AssetType" AS ENUM ('audio', 'video', 'thumbnail', 'caption_package
 CREATE TYPE "PublishStatus" AS ENUM ('draft', 'scheduled', 'published', 'failed');
 
 CREATE TABLE "digital_humans" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "display_name" TEXT NOT NULL,
   "legal_name" TEXT,
   "avatar_url" TEXT,
@@ -17,7 +17,7 @@ CREATE TABLE "digital_humans" (
 );
 
 CREATE TABLE "personas" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "digital_human_id" UUID NOT NULL,
   "archetype" TEXT NOT NULL,
   "backstory" TEXT NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE "personas" (
 );
 
 CREATE TABLE "consent_records" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "digital_human_id" UUID NOT NULL,
   "consented_name" TEXT NOT NULL,
   "document_url" TEXT NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE "consent_records" (
 );
 
 CREATE TABLE "song_ideas" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "digital_human_id" UUID NOT NULL,
   "theme" TEXT NOT NULL,
   "lyrics_direction" TEXT NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE "song_ideas" (
 );
 
 CREATE TABLE "content_plans" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "digital_human_id" UUID NOT NULL,
   "song_idea_id" UUID NOT NULL,
   "scheduled_date" DATE NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE "content_plans" (
 );
 
 CREATE TABLE "file_assets" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "original_name" TEXT NOT NULL,
   "storage_key" TEXT NOT NULL,
   "mime_type" TEXT NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE "file_assets" (
 );
 
 CREATE TABLE "publish_assets" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "content_plan_id" UUID NOT NULL,
   "asset_type" "AssetType" NOT NULL,
   "asset_url" TEXT NOT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE "publish_assets" (
 );
 
 CREATE TABLE "platform_posts" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "content_plan_id" UUID NOT NULL,
   "platform" "TargetPlatform" NOT NULL,
   "status" "PublishStatus" NOT NULL DEFAULT 'draft',
