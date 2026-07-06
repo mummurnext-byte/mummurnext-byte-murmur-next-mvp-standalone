@@ -3,8 +3,12 @@ import Link from "next/link";
 
 import {
   addConsentRecordAction,
+  cancelWorkflowAction,
   createDigitalHumanAction,
   generateWeeklyPlanAction,
+  nextWorkflowStepAction,
+  retryWorkflowStepAction,
+  startWorkflowAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -15,6 +19,7 @@ import { CopyFields } from "@/components/copy-fields";
 import { prisma } from "@/lib/prisma";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
+import { buildTimeline, classifyWorkflowState } from "@/services/workflow-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +38,7 @@ export default async function Home({
   }>;
 }) {
   const params = await searchParams;
-  const [digitalHumans, contentPlans, selectedHuman, selectedPlan] = await Promise.all([
+  const [digitalHumans, contentPlans, workflows, selectedHuman, selectedPlan] = await Promise.all([
     prisma.digitalHuman.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
@@ -41,6 +46,7 @@ export default async function Home({
       include: { persona: true, consentRecords: { where: { deletedAt: null }, take: 5 } }
     }),
     loadContentPlans(),
+    loadWorkflowRuns(),
     params?.digitalHumanId ? loadSelectedHuman(params.digitalHumanId) : null,
     params?.planId ? loadSelectedPlan(params.planId) : null
   ]);
@@ -55,6 +61,8 @@ export default async function Home({
             provider API calls, no cookies or tokens.
           </p>
         </header>
+
+        <WorkflowDashboard workflows={workflows} />
 
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <section className="space-y-4">
@@ -142,6 +150,15 @@ async function loadSelectedPlan(id: string) {
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         take: 20
+      },
+      workflowRuns: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        include: {
+          steps: { orderBy: { createdAt: "asc" } },
+          events: { orderBy: { timestamp: "desc" }, take: 20 }
+        }
       }
     }
   });
@@ -152,8 +169,87 @@ async function loadContentPlans() {
     where: { deletedAt: null },
     orderBy: [{ scheduledDate: "asc" }, { createdAt: "asc" }],
     take: 100,
-    include: { digitalHuman: true, songIdea: true }
+    include: {
+      digitalHuman: true,
+      songIdea: true,
+      workflowRuns: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 1
+      }
+    }
   });
+}
+
+async function loadWorkflowRuns() {
+  return prisma.workflowRun.findMany({
+    where: { deletedAt: null },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    include: {
+      contentPlan: { include: { digitalHuman: true } },
+      steps: { orderBy: { createdAt: "asc" } }
+    }
+  });
+}
+
+function WorkflowDashboard({ workflows }: { workflows: Awaited<ReturnType<typeof loadWorkflowRuns>> }) {
+  const counts = workflows.reduce(
+    (sum, workflow) => {
+      sum[classifyWorkflowState(workflow.currentState)] += 1;
+      return sum;
+    },
+    { waiting: 0, running: 0, failed: 0, completed: 0 }
+  );
+
+  return (
+    <Panel title="Workflow Dashboard">
+      <div className="grid gap-3 md:grid-cols-4">
+        <Metric label="Waiting" value={counts.waiting} />
+        <Metric label="Running" value={counts.running} />
+        <Metric label="Failed" value={counts.failed} />
+        <Metric label="Completed" value={counts.completed} />
+      </div>
+
+      {workflows.length === 0 ? (
+        <p className="mt-4 text-sm text-zinc-400">No workflows started yet.</p>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {workflows.slice(0, 8).map((workflow) => {
+            const failedStep = workflow.steps.find((step) => step.state === "failed");
+            return (
+              <div key={workflow.id} className="rounded-md border border-zinc-800 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">{workflow.contentPlan.title}</div>
+                    <div className="mt-1 text-xs text-zinc-500">
+                      {workflow.contentPlan.digitalHuman.displayName} / {workflow.currentState}
+                      {failedStep ? ` / failed: ${failedStep.stepKey}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/?planId=${workflow.contentPlanId}`} className="rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-200">
+                      View
+                    </Link>
+                    {workflow.currentState === "failed" ? <WorkflowButton action={retryWorkflowStepAction} workflowRunId={workflow.id}>Retry</WorkflowButton> : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+      <div className="text-xs uppercase text-zinc-500">{label}</div>
+      <div className="mt-2 text-2xl font-semibold">{value}</div>
+    </div>
+  );
 }
 
 function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>> }) {
@@ -347,9 +443,74 @@ function SelectedPlanPanel({
 
           <AssetList title="Music Assets" assets={audioAssets} mediaType="audio" />
           <AssetList title="Video Assets" assets={videoAssets} mediaType="video" />
+          <WorkflowTimelinePanel contentPlan={contentPlan} />
         </aside>
       </div>
     </Panel>
+  );
+}
+
+function WorkflowTimelinePanel({ contentPlan }: { contentPlan: NonNullable<SelectedPlan> }) {
+  const workflow = contentPlan.workflowRuns[0];
+
+  if (!workflow) {
+    return (
+      <div className="rounded-md border border-zinc-800 p-3">
+        <div className="text-sm font-medium">Workflow Timeline</div>
+        <p className="mt-2 text-sm text-zinc-400">Start a workflow to track production progress.</p>
+        <form action={startWorkflowAction} className="mt-3">
+          <input type="hidden" name="contentPlanId" value={contentPlan.id} />
+          <Submit>Start Workflow</Submit>
+        </form>
+      </div>
+    );
+  }
+
+  const timeline = buildTimeline(workflow.steps);
+
+  return (
+    <div className="rounded-md border border-zinc-800 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium">Workflow Timeline</div>
+          <div className="mt-1 text-xs text-zinc-500">Current state: {workflow.currentState}</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <WorkflowButton action={nextWorkflowStepAction} workflowRunId={workflow.id}>Next</WorkflowButton>
+          <WorkflowButton action={retryWorkflowStepAction} workflowRunId={workflow.id}>Retry</WorkflowButton>
+          <WorkflowButton action={cancelWorkflowAction} workflowRunId={workflow.id}>Cancel</WorkflowButton>
+        </div>
+      </div>
+
+      <ol className="mt-4 space-y-3">
+        {timeline.map((item) => (
+          <li key={item.stepKey} className="rounded border border-zinc-800 p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span>{timelineIcon(item.state)} {item.label}</span>
+              <span className="text-xs text-zinc-500">{item.state}</span>
+            </div>
+            <div className="mt-2 text-xs text-zinc-500">
+              Started: {item.startedAt ? formatDateTime(item.startedAt) : "-"} / Finished:{" "}
+              {item.finishedAt ? formatDateTime(item.finishedAt) : "-"}
+            </div>
+            {item.errorMessage ? <div className="mt-2 text-xs text-red-300">{item.errorMessage}</div> : null}
+          </li>
+        ))}
+      </ol>
+
+      {workflow.events.length > 0 ? (
+        <div className="mt-4">
+          <div className="text-sm font-medium">Events</div>
+          <ul className="mt-2 space-y-1 text-xs text-zinc-500">
+            {workflow.events.map((event) => (
+              <li key={event.id}>
+                {formatDateTime(event.timestamp)} / {event.actor} / {event.eventType}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -405,6 +566,7 @@ function ContentPlansPanel({
                 <span>{formatDate(plan.scheduledDate)}</span>
                 <span>{plan.targetPlatform}</span>
                 <span>{plan.status}</span>
+                {plan.workflowRuns[0] ? <span>workflow: {plan.workflowRuns[0].currentState}</span> : null}
                 <span>{plan.digitalHuman.displayName}</span>
               </div>
               <div className="mt-2 font-medium">{plan.title}</div>
@@ -511,6 +673,25 @@ function Submit({ children }: { children: React.ReactNode }) {
   );
 }
 
+function WorkflowButton({
+  action,
+  workflowRunId,
+  children
+}: {
+  action: (formData: FormData) => Promise<void>;
+  workflowRunId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <form action={action}>
+      <input type="hidden" name="workflowRunId" value={workflowRunId} />
+      <button type="submit" className="rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-200">
+        {children}
+      </button>
+    </form>
+  );
+}
+
 function assetMetadata(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return {};
   return metadata as { originalName?: string };
@@ -523,6 +704,24 @@ function formatDate(date: Date) {
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
+}
+
+function formatDateTime(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC"
+  }).format(date);
+}
+
+function timelineIcon(state: string) {
+  if (state === "failed") return "failed";
+  if (state.endsWith("_ready") || state === "published") return "done";
+  if (state === "planning" || state.endsWith("_pending")) return "running";
+  return "waiting";
 }
 
 function isUuid(value: string) {

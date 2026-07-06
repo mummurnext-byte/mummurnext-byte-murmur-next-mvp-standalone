@@ -12,6 +12,21 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `updateContentPlanStatusAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
+- `startWorkflowAction`
+- `nextWorkflowStepAction`
+- `retryWorkflowStepAction`
+- `cancelWorkflowAction`
+
+## Workflow Actions
+
+Workflow actions manage state only:
+
+- `startWorkflowAction`: creates a workflow run for a Content Plan.
+- `nextWorkflowStepAction`: advances the workflow based on current local state.
+- `retryWorkflowStepAction`: retries the failed/current workflow step.
+- `cancelWorkflowAction`: marks the workflow as failed with a cancellation event.
+
+No action calls TikTok, YouTube, Suno, HeyGen, Akool, D-ID, or any real provider API.
 
 ## Media Route
 

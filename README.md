@@ -11,6 +11,7 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
+- Track Content Plan workflow state from planning through publishing.
 
 No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
 
@@ -111,11 +112,37 @@ This workflow does not use unofficial APIs, browser automation, cookies, tokens,
 
 This workflow does not call video provider APIs, automate login, or store cookies/tokens.
 
+## Workflow Engine
+
+Workflow Engine tracks the production pipeline for each Content Plan:
+
+```text
+Digital Human -> Weekly Plan -> Music -> Video -> Publish
+```
+
+Supported workflow states:
+
+- `draft`
+- `planning`
+- `music_pending`
+- `music_ready`
+- `video_pending`
+- `video_ready`
+- `publish_ready`
+- `scheduled`
+- `published`
+- `failed`
+
+The Workflow Dashboard shows waiting, running, failed, and completed workflows. Each Content Plan has a Timeline with step timestamps, retry count, error messages, and an event log.
+
+Workflow Engine does not call real external APIs. It coordinates existing mock/manual steps only.
+
 ## Future Integrations
 
 Provider abstractions live under `src/services`:
 
 - `MusicProvider`
 - `VideoProvider`
+- `WorkflowService`
 
 Future official API integrations should add new provider implementations without changing the Content Plan ownership model.
