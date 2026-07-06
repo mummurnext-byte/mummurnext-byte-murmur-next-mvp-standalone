@@ -54,6 +54,12 @@ export default async function Home({
             Standalone AI digital-human music content system. No Back Office modules, no real AI
             provider API calls, no cookies or tokens.
           </p>
+          <Link
+            href="/admin/deployment-checklist"
+            className="mt-3 inline-flex rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500"
+          >
+            Deployment Checklist
+          </Link>
         </header>
 
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">

@@ -57,6 +57,79 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Environment Variables
+
+Copy `.env.example` to `.env` for local development. Do not commit `.env`.
+
+| Variable | Required | Example | Notes |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/mummur_next_mvp?schema=public` | PostgreSQL connection string used by Prisma. |
+| `OPENAI_API_KEY` | No | empty | Optional. Leave empty to use mock generation. |
+| `APP_BASE_URL` | Yes | `http://localhost:3000` | Public base URL for the app. |
+| `STORAGE_PROVIDER` | Yes | `local` | Use `local` for development or `vercel_blob` for Vercel media uploads. |
+| `BLOB_READ_WRITE_TOKEN` | Required for `vercel_blob` | empty | Vercel Blob read/write token. Configure in Vercel, never commit a real value. |
+| `NODE_ENV` | Yes | `development` | Use `production` on Vercel. |
+| `MAX_UPLOAD_BYTES` | No | `104857600` | Upload size limit in bytes. |
+| `LOCAL_FILE_STORAGE_DIR` | No | `./uploads` | Local development upload directory. Not durable on Vercel. |
+
+## Vercel Deployment
+
+Mummur Next MVP is a standard Next.js app and can be deployed to Vercel after a
+production PostgreSQL database is available.
+
+1. Create a production PostgreSQL database, such as Neon, Supabase, RDS, or
+   another managed Postgres service.
+2. Add environment variables in Vercel:
+   - `DATABASE_URL`
+   - `OPENAI_API_KEY` (optional; leave empty to use mock generation)
+   - `STORAGE_PROVIDER` (`vercel_blob` for production uploads)
+   - `BLOB_READ_WRITE_TOKEN` (required when `STORAGE_PROVIDER=vercel_blob`)
+   - `APP_BASE_URL`
+   - `NODE_ENV`
+   - `MAX_UPLOAD_BYTES`
+3. Run production migrations before serving traffic:
+
+```bash
+npx prisma migrate deploy
+```
+
+4. Deploy from GitHub or with Vercel CLI.
+
+The app runs `prisma generate` during `postinstall`, and `npm run build` also
+runs `prisma generate && next build` so Prisma Client is available in Vercel
+builds.
+
+### File Uploads on Vercel
+
+This MVP includes `LocalStorageProvider` for local development and
+`VercelBlobStorageProvider` for durable Vercel media uploads. Local filesystem
+uploads are not durable in serverless deployments and can disappear between
+deployments or function instances.
+
+Provider keys:
+
+- `local`
+- `vercel_blob`
+
+Reserved future provider keys:
+
+- `s3`
+- `r2`
+
+The storage abstraction is in `src/lib/storage-provider.ts`. The current upload
+limit is controlled by `MAX_UPLOAD_BYTES`; default is `104857600` bytes.
+
+### Deployment Checklist Page
+
+After deployment, open:
+
+```text
+/admin/deployment-checklist
+```
+
+It checks database connectivity, storage provider configuration, LLM fallback,
+build version, app base URL, and environment mode without displaying secrets.
+
 ## Developer Commands
 
 ```bash

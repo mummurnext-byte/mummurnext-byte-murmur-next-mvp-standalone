@@ -26,6 +26,24 @@ Rules:
 - The linked `FileAsset` must belong to the same content plan.
 - Local storage paths are not exposed to the browser.
 
+## Admin Deployment Checklist
+
+### `GET /admin/deployment-checklist`
+
+Renders a read-only deployment readiness page.
+
+Shows:
+
+- Database connected
+- Storage provider configured
+- LLM provider configured
+- Build version
+- App base URL
+- Environment mode
+
+The page does not render `DATABASE_URL`, `OPENAI_API_KEY`, tokens, cookies, or
+other secrets.
+
 ## Upload Rules
 
 Music:

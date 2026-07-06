@@ -1,9 +1,8 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { createHash } from "node:crypto";
 
 import { getEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { getObjectStorageProvider } from "@/lib/storage-provider";
 
 export async function storeUploadedFile(input: {
   file: File;
@@ -18,22 +17,15 @@ export async function storeUploadedFile(input: {
 
   const buffer = Buffer.from(await input.file.arrayBuffer());
   const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
-  const extension = path.extname(input.file.name).toLowerCase();
-  const storageKey = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}${extension}`;
-  const storageRoot = path.resolve(env.localFileStorageDir);
-  const storagePath = path.resolve(storageRoot, storageKey);
-
-  if (storagePath !== storageRoot && !storagePath.startsWith(`${storageRoot}${path.sep}`)) {
-    throw new Error("Invalid file storage key.");
-  }
-
-  await mkdir(path.dirname(storagePath), { recursive: true });
-  await writeFile(storagePath, buffer);
+  const storage = await getObjectStorageProvider().storeObject({
+    fileName: input.file.name,
+    buffer
+  });
 
   return prisma.fileAsset.create({
     data: {
       originalName: input.file.name,
-      storageKey,
+      storageKey: storage.storageKey,
       mimeType: input.file.type || "application/octet-stream",
       byteSize: input.file.size,
       checksumSha256,
@@ -44,13 +36,5 @@ export async function storeUploadedFile(input: {
 }
 
 export async function readStoredFile(storageKey: string) {
-  const env = getEnv();
-  const storageRoot = path.resolve(env.localFileStorageDir);
-  const storagePath = path.resolve(storageRoot, storageKey);
-
-  if (storagePath !== storageRoot && !storagePath.startsWith(`${storageRoot}${path.sep}`)) {
-    throw new Error("Invalid file storage key.");
-  }
-
-  return readFile(storagePath);
+  return getObjectStorageProvider().readObject(storageKey);
 }

@@ -11,3 +11,5 @@
 - Added manual HeyGen, Akool, and D-ID video provider workflow.
 - Added music and video upload with local file metadata and playback.
 - Added tests for provider selection, prompt generation, upload validation, and metadata.
+- Added Vercel deployment readiness docs, environment example, storage provider abstraction, and admin deployment checklist page.
+- Added Vercel Blob storage provider for durable production media uploads.
