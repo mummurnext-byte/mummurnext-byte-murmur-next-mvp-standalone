@@ -57,6 +57,20 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Environment Variables
+
+Copy `.env.example` to `.env` for local development. Do not commit `.env`.
+
+| Variable | Required | Example | Notes |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/mummur_next_mvp?schema=public` | PostgreSQL connection string used by Prisma. |
+| `OPENAI_API_KEY` | No | empty | Optional. Leave empty to use mock generation. |
+| `APP_BASE_URL` | Yes | `http://localhost:3000` | Public base URL for the app. |
+| `STORAGE_PROVIDER` | Yes | `local` | Current MVP supports `local`; `s3`, `r2`, and `vercel_blob` are reserved. |
+| `NODE_ENV` | Yes | `development` | Use `production` on Vercel. |
+| `MAX_UPLOAD_BYTES` | No | `104857600` | Upload size limit in bytes. |
+| `LOCAL_FILE_STORAGE_DIR` | No | `./uploads` | Local development upload directory. Not durable on Vercel. |
+
 ## Vercel Deployment
 
 Mummur Next MVP is a standard Next.js app and can be deployed to Vercel after a
@@ -69,6 +83,7 @@ production PostgreSQL database is available.
    - `OPENAI_API_KEY` (optional; leave empty to use mock generation)
    - `STORAGE_PROVIDER` (`local` for this MVP, object storage for production uploads later)
    - `APP_BASE_URL`
+   - `NODE_ENV`
    - `MAX_UPLOAD_BYTES`
 3. Run production migrations before serving traffic:
 
