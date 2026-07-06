@@ -7,8 +7,10 @@ import {
   generateWeeklyPlanAction,
   markPlatformPostPublishedAction,
   retryMusicApiJobAction,
+  retryVideoApiJobAction,
   savePlatformPostAction,
   startMusicApiJobAction,
+  startVideoApiJobAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -21,6 +23,7 @@ import { llmProviderOptions } from "@/services/llm-provider";
 import { isRetryableMusicApiStatus, musicApiProviders } from "@/services/music-api-provider";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { defaultPublishCopy, publishPlatforms, publishStatuses } from "@/services/publish-workflow";
+import { isRetryableVideoApiStatus, videoApiProviders } from "@/services/video-api-provider";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
 
 export const dynamic = "force-dynamic";
@@ -171,6 +174,11 @@ async function loadSelectedPlan(id: string) {
         }
       },
       musicGenerationJobs: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 20
+      },
+      videoGenerationJobs: {
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         take: 20
@@ -421,6 +429,8 @@ function SelectedPlanPanel({
             <Submit>Upload Video</Submit>
           </form>
 
+          <VideoApiJobsPanel contentPlan={contentPlan} hasMusic={audioAssets.length > 0} />
+
           <AssetList title="Music Assets" assets={audioAssets} mediaType="audio" />
           <AssetList title="Video Assets" assets={videoAssets} mediaType="video" />
           <PublishWorkflowPanel contentPlan={contentPlan} hasVideo={videoAssets.length > 0} />
@@ -473,6 +483,71 @@ function MusicApiJobsPanel({ contentPlan }: { contentPlan: NonNullable<SelectedP
               </div>
               {isRetryableMusicApiStatus(job.status) ? (
                 <form action={retryMusicApiJobAction} className="mt-3">
+                  <input type="hidden" name="id" value={job.id} />
+                  <Submit>Retry</Submit>
+                </form>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VideoApiJobsPanel({
+  contentPlan,
+  hasMusic
+}: {
+  contentPlan: NonNullable<SelectedPlan>;
+  hasMusic: boolean;
+}) {
+  return (
+    <div className="space-y-3 rounded-md border border-zinc-800 p-3">
+      <div>
+        <div className="text-sm font-medium">Video API Provider</div>
+        <p className="mt-1 text-xs text-zinc-500">Official API or mock API only. No cookies or browser login.</p>
+      </div>
+
+      {hasMusic ? (
+        <form action={startVideoApiJobAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+          <input type="hidden" name="contentPlanId" value={contentPlan.id} />
+          <Select label="API provider" name="provider" defaultValue={videoApiProviders[0].providerKey}>
+            {videoApiProviders.map((provider) => (
+              <option key={provider.providerKey} value={provider.providerKey}>
+                {provider.providerName}
+              </option>
+            ))}
+          </Select>
+          <Submit>Generate Video via API</Submit>
+        </form>
+      ) : (
+        <p className="text-sm text-zinc-400">Upload or generate a music asset before video API generation.</p>
+      )}
+
+      {contentPlan.videoGenerationJobs.length === 0 ? (
+        <p className="text-sm text-zinc-400">No video API jobs yet.</p>
+      ) : (
+        <div className="grid gap-3">
+          {contentPlan.videoGenerationJobs.map((job) => (
+            <div key={job.id} className="rounded border border-zinc-800 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium">{job.provider}</div>
+                  <div className="text-xs text-zinc-500">Status: {job.status}</div>
+                </div>
+                {job.generatedVideoUrl ? (
+                  <a className="text-xs text-zinc-300 underline" href={job.generatedVideoUrl}>
+                    generatedVideoUrl
+                  </a>
+                ) : null}
+              </div>
+              {job.errorMessage ? <p className="mt-2 text-xs text-red-300">{job.errorMessage}</p> : null}
+              <div className="mt-2 text-xs text-zinc-500">
+                Provider config: {compactJson(job.providerConfig)}
+              </div>
+              {isRetryableVideoApiStatus(job.status) ? (
+                <form action={retryVideoApiJobAction} className="mt-3">
                   <input type="hidden" name="id" value={job.id} />
                   <Submit>Retry</Submit>
                 </form>

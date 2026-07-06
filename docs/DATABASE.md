@@ -12,6 +12,7 @@ The database is PostgreSQL through Prisma.
 - `FileAsset`: uploaded file metadata.
 - `PublishAsset`: uploaded audio/video metadata linked to a content plan.
 - `MusicGenerationJob`: music API generation job linked to a content plan.
+- `VideoGenerationJob`: video API generation job linked to a content plan and source music asset.
 - `PlatformPost`: manual platform publishing record.
 - `PlatformPostHistory`: status history for platform publishing.
 
@@ -48,6 +49,14 @@ Video assets are stored as:
 - `asset_type = video`
 - `provider = heygen_manual`, `akool_manual`, or `did_manual`
 
+Video API generated assets are also stored as:
+
+- `asset_type = video`
+- `provider = mock_video_api` or a future official API provider key
+- `asset_url = generatedVideoUrl`
+- `metadata.workflow = video_api_generation`
+- `metadata.sourceMusicAssetId = source music asset ID`
+
 Both store file metadata in `PublishAsset.metadata`, including `fileAssetId`, original filename, MIME type, size, checksum, storage key, and workflow.
 
 ## Music API Jobs
@@ -69,6 +78,27 @@ Music API jobs store:
 - retry source job ID
 
 Only failed jobs are retryable. A retry creates a new `MusicGenerationJob` with `retryOfJobId` pointing to the failed job.
+
+## Video API Jobs
+
+`VideoGenerationJob.status`:
+
+- `queued`
+- `processing`
+- `completed`
+- `failed`
+
+Video API jobs store:
+
+- provider key
+- provider config without credentials
+- request payload
+- generated video URL
+- error message
+- source music asset ID
+- retry source job ID
+
+Only failed jobs are retryable. A retry creates a new `VideoGenerationJob` with `retryOfJobId` pointing to the failed job.
 
 ## Publish Workflow
 

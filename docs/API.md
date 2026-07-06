@@ -14,6 +14,8 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `retryMusicApiJobAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
+- `startVideoApiJobAction`
+- `retryVideoApiJobAction`
 - `savePlatformPostAction`
 - `markPlatformPostPublishedAction`
 
@@ -40,6 +42,23 @@ Completed jobs store `generatedAudioUrl` on `MusicGenerationJob` and create an a
 - `id`
 
 Only failed music API jobs can be retried.
+
+`startVideoApiJobAction` accepts:
+
+- `contentPlanId`
+- `provider`
+
+Currently supported provider:
+
+- `mock_video_api`
+
+Video API generation requires an existing audio `PublishAsset` on the Content Plan. Completed jobs store `generatedVideoUrl` on `VideoGenerationJob` and create a video `PublishAsset`.
+
+`retryVideoApiJobAction` accepts:
+
+- `id`
+
+Only failed video API jobs can be retried.
 
 ## Media Route
 
@@ -71,8 +90,10 @@ Video:
 - Weekly plan generation can call OpenAI only when `OPENAI_API_KEY` is configured.
 - The OpenAI API key is read from environment variables and is not stored in the database or written to logs.
 - Music API generation currently uses a mock API provider only.
-- Future music API providers must use official APIs only.
-- Music, video, TikTok, and YouTube provider APIs are not called.
+- Video API generation currently uses a mock API provider only.
+- Future music and video API providers must use official APIs only.
+- TikTok and YouTube provider APIs are not called.
 - No cookies, session tokens, or provider credentials are stored.
+- Browser login automation is intentionally not used.
 - Browser automation is intentionally not used.
 - TikTok and YouTube publishing is manual only in this MVP.

@@ -10,11 +10,12 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Generate mock music API jobs for future official Music API integration.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
+- Generate mock video API jobs for future official Video API integration.
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
 - Prepare manual publishing records for TikTok, YouTube Shorts, and YouTube.
 
-Video, TikTok, and YouTube APIs are not called in this MVP. Weekly planning can use OpenAI only when `OPENAI_API_KEY` is configured; otherwise it automatically uses the Mock provider. Music API generation is currently mock-only and does not call unofficial APIs.
+TikTok and YouTube APIs are not called in this MVP. Weekly planning can use OpenAI only when `OPENAI_API_KEY` is configured; otherwise it automatically uses the Mock provider. Music and video API generation are currently mock-only and do not call unofficial APIs.
 
 ## Requirements
 
@@ -137,6 +138,22 @@ Only official API providers or mock API providers should be added here. Do not u
 
 This workflow does not call video provider APIs, automate login, or store cookies/tokens.
 
+## Video API Workflow
+
+1. Upload or generate a music asset for a Content Plan.
+2. Use the Video API Provider panel.
+3. Choose `Mock Video API`.
+4. Generate a video API job.
+5. Review job status:
+   - `queued`
+   - `processing`
+   - `completed`
+   - `failed`
+6. Completed jobs store `generatedVideoUrl` and create a video `PublishAsset`.
+7. Failed jobs can be retried with the Retry button.
+
+Only official API providers or mock API providers should be added here. Do not use unofficial HeyGen/Akool/D-ID APIs, browser automation, cookies, or account tokens.
+
 ## Manual Publish Workflow
 
 1. Upload a video asset to a Content Plan.
@@ -160,5 +177,6 @@ Provider abstractions live under `src/services`:
 - `MusicProvider`
 - `MusicApiProvider`
 - `VideoProvider`
+- `VideoApiProvider`
 
 Future official API integrations should add new provider implementations without changing the Content Plan ownership model.

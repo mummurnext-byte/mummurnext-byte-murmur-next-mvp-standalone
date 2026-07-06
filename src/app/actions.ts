@@ -24,6 +24,8 @@ import {
   splitPublishHashtags
 } from "@/services/publish-workflow";
 import { generateWeeklyPlan } from "@/services/weekly-plan";
+import { getVideoApiProvider, isVideoApiProviderKey } from "@/services/video-api-provider";
+import type { VideoApiJobResult } from "@/services/video-api-provider";
 import type { VideoProviderKey } from "@/services/video-provider";
 import { videoProviders } from "@/services/video-provider";
 
@@ -259,6 +261,139 @@ export async function uploadVideoAssetAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function startVideoApiJobAction(formData: FormData) {
+  const contentPlanId = requiredString(formData, "contentPlanId");
+  const providerKey = requiredString(formData, "provider");
+
+  if (!isVideoApiProviderKey(providerKey)) throw new Error("Video API provider is not supported.");
+
+  const contentPlan = await requireVideoApiContentPlan(contentPlanId);
+  const musicAsset = await requireLatestMusicAssetForVideoApi(contentPlanId);
+  const provider = getVideoApiProvider(providerKey);
+  const result = await provider.createJob({ contentPlan, musicAsset });
+
+  await createVideoApiJobResult({
+    contentPlanId,
+    sourceMusicAssetId: musicAsset.id,
+    providerKey,
+    result,
+    previousContentStatus: contentPlan.status
+  });
+
+  revalidatePath("/");
+}
+
+export async function retryVideoApiJobAction(formData: FormData) {
+  const id = requiredString(formData, "id");
+  const previousJob = await prisma.videoGenerationJob.findFirst({
+    where: { id, deletedAt: null, contentPlan: { deletedAt: null, digitalHuman: { deletedAt: null } } },
+    include: {
+      sourceMusicAsset: {
+        select: { id: true, provider: true, metadata: true }
+      },
+      contentPlan: {
+        include: {
+          digitalHuman: { include: { persona: true } },
+          songIdea: true
+        }
+      }
+    }
+  });
+
+  if (!previousJob) throw new Error("Video API job was not found or is archived.");
+  if (previousJob.status !== "failed") throw new Error("Only failed video API jobs can be retried.");
+  if (!isVideoApiProviderKey(previousJob.provider)) throw new Error("Video API provider is not supported.");
+
+  const provider = getVideoApiProvider(previousJob.provider);
+  const result = await provider.retryJob({
+    contentPlan: previousJob.contentPlan,
+    musicAsset: previousJob.sourceMusicAsset
+  });
+
+  await createVideoApiJobResult({
+    contentPlanId: previousJob.contentPlanId,
+    sourceMusicAssetId: previousJob.sourceMusicAssetId,
+    providerKey: previousJob.provider,
+    result,
+    retryOfJobId: previousJob.id,
+    previousContentStatus: previousJob.contentPlan.status
+  });
+
+  revalidatePath("/");
+}
+
+async function requireVideoApiContentPlan(id: string) {
+  const contentPlan = await prisma.contentPlan.findFirst({
+    where: { id, deletedAt: null, digitalHuman: { deletedAt: null } },
+    include: {
+      digitalHuman: { include: { persona: true } },
+      songIdea: true
+    }
+  });
+
+  if (!contentPlan) throw new Error("Content plan was not found or is archived.");
+  return contentPlan;
+}
+
+async function createVideoApiJobResult({
+  contentPlanId,
+  sourceMusicAssetId,
+  providerKey,
+  result,
+  retryOfJobId,
+  previousContentStatus
+}: {
+  contentPlanId: string;
+  sourceMusicAssetId: string;
+  providerKey: string;
+  result: VideoApiJobResult;
+  retryOfJobId?: string;
+  previousContentStatus: ContentStatus;
+}) {
+  const completedAt = result.status === "completed" || result.status === "failed" ? new Date() : null;
+
+  await prisma.$transaction(async (tx) => {
+    const job = await tx.videoGenerationJob.create({
+      data: {
+        contentPlanId,
+        sourceMusicAssetId,
+        provider: providerKey,
+        status: result.status,
+        providerConfig: result.providerConfig,
+        requestPayload: result.requestPayload,
+        generatedVideoUrl: result.generatedVideoUrl,
+        errorMessage: result.errorMessage,
+        retryOfJobId,
+        startedAt: new Date(),
+        completedAt
+      }
+    });
+
+    if (result.status === "completed" && result.generatedVideoUrl) {
+      await tx.publishAsset.create({
+        data: {
+          contentPlanId,
+          assetType: "video",
+          assetUrl: result.generatedVideoUrl,
+          provider: providerKey,
+          metadata: {
+            workflow: "video_api_generation",
+            videoApiJobId: job.id,
+            sourceMusicAssetId,
+            generatedVideoUrl: result.generatedVideoUrl,
+            providerConfig: result.providerConfig
+          }
+        }
+      });
+
+      await tx.contentPlan.update({
+        where: { id: contentPlanId },
+        data: { status: nextVideoUploadStatus(previousContentStatus) }
+      });
+    }
+  });
+}
+
 export async function savePlatformPostAction(formData: FormData) {
   const contentPlanId = requiredString(formData, "contentPlanId");
   const platform = requiredString(formData, "platform");
@@ -451,6 +586,17 @@ async function requireLatestMusicAsset(contentPlanId: string) {
   });
 
   if (!musicAsset) throw new Error("A music asset is required before video upload.");
+  return musicAsset;
+}
+
+async function requireLatestMusicAssetForVideoApi(contentPlanId: string) {
+  const musicAsset = await prisma.publishAsset.findFirst({
+    where: { contentPlanId, assetType: "audio", deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, provider: true, metadata: true }
+  });
+
+  if (!musicAsset) throw new Error("A music asset is required before video API generation.");
   return musicAsset;
 }
 

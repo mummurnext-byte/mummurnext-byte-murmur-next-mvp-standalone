@@ -43,6 +43,13 @@ enum MusicApiJobStatus {
   failed
 }
 
+enum VideoApiJobStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
 model DigitalHuman {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String          @map("display_name")
@@ -130,6 +137,7 @@ model ContentPlan {
   publishAssets  PublishAsset[]
   platformPosts  PlatformPost[]
   musicGenerationJobs MusicGenerationJob[]
+  videoGenerationJobs VideoGenerationJob[]
 
   @@index([digitalHumanId])
   @@index([songIdeaId])
@@ -166,6 +174,7 @@ model PublishAsset {
   updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt     DateTime?   @map("deleted_at") @db.Timestamptz(6)
   contentPlan   ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+  sourceVideoGenerationJobs VideoGenerationJob[]
 
   @@index([contentPlanId])
   @@index([assetType])
@@ -234,4 +243,31 @@ model MusicGenerationJob {
   @@index([status])
   @@index([retryOfJobId])
   @@map("music_generation_jobs")
+}
+
+model VideoGenerationJob {
+  id                String            @id @default(uuid()) @db.Uuid
+  contentPlanId     String            @map("content_plan_id") @db.Uuid
+  sourceMusicAssetId String           @map("source_music_asset_id") @db.Uuid
+  provider          String
+  status            VideoApiJobStatus @default(queued)
+  providerConfig    Json?             @map("provider_config")
+  requestPayload    Json?             @map("request_payload")
+  generatedVideoUrl String?           @map("generated_video_url")
+  errorMessage      String?           @map("error_message")
+  retryOfJobId      String?           @map("retry_of_job_id") @db.Uuid
+  startedAt         DateTime?         @map("started_at") @db.Timestamptz(6)
+  completedAt       DateTime?         @map("completed_at") @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  contentPlan       ContentPlan       @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+  sourceMusicAsset  PublishAsset      @relation(fields: [sourceMusicAssetId], references: [id], onDelete: Restrict)
+
+  @@index([contentPlanId])
+  @@index([sourceMusicAssetId])
+  @@index([provider])
+  @@index([status])
+  @@index([retryOfJobId])
+  @@map("video_generation_jobs")
 }
