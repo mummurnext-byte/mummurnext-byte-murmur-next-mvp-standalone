@@ -57,6 +57,58 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Vercel Deployment
+
+Mummur Next MVP is a standard Next.js app and can be deployed to Vercel after a
+production PostgreSQL database is available.
+
+1. Create a production PostgreSQL database, such as Neon, Supabase, RDS, or
+   another managed Postgres service.
+2. Add environment variables in Vercel:
+   - `DATABASE_URL`
+   - `OPENAI_API_KEY` (optional; leave empty to use mock generation)
+   - `STORAGE_PROVIDER` (`local` for this MVP, object storage for production uploads later)
+   - `APP_BASE_URL`
+   - `MAX_UPLOAD_BYTES`
+3. Run production migrations before serving traffic:
+
+```bash
+npx prisma migrate deploy
+```
+
+4. Deploy from GitHub or with Vercel CLI.
+
+The app runs `prisma generate` during `postinstall`, and `npm run build` also
+runs `prisma generate && next build` so Prisma Client is available in Vercel
+builds.
+
+### File Uploads on Vercel
+
+This MVP includes `LocalStorageProvider` for local development. Local filesystem
+uploads are not durable in serverless deployments and can disappear between
+deployments or function instances. Before using production uploads on Vercel,
+replace local storage with an object storage implementation.
+
+Reserved provider keys:
+
+- `s3`
+- `r2`
+- `vercel_blob`
+
+The storage abstraction is in `src/lib/storage-provider.ts`. The current upload
+limit is controlled by `MAX_UPLOAD_BYTES`; default is `104857600` bytes.
+
+### Deployment Checklist Page
+
+After deployment, open:
+
+```text
+/admin/deployment-checklist
+```
+
+It checks database connectivity, storage provider configuration, LLM fallback,
+build version, app base URL, and environment mode without displaying secrets.
+
 ## Developer Commands
 
 ```bash

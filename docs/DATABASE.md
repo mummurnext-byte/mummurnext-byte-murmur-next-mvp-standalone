@@ -2,6 +2,17 @@
 
 The database is PostgreSQL through Prisma.
 
+## Production Migration
+
+Use Prisma migrations for production databases:
+
+```bash
+npx prisma migrate deploy
+```
+
+Vercel builds generate Prisma Client through `postinstall`. Do not run
+`prisma migrate dev` against production.
+
 ## Core Models
 
 - `DigitalHuman`: digital-human profile.
