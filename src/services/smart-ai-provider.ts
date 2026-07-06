@@ -215,7 +215,7 @@ export function createLLMProvider(source: EnvSource = process.env): LLMProvider 
   }
 
   if (env.llmProvider === "gemini" && env.geminiApiKey) {
-    return new GeminiProvider(env.geminiApiKey, modelOrDefault(env.llmModel, "gemini-1.5-flash"));
+    return new GeminiProvider(env.geminiApiKey, modelOrDefault(env.llmModel, "gemini-2.5-flash"));
   }
 
   if (env.llmProvider === "groq" && env.groqApiKey) {

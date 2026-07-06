@@ -67,7 +67,7 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/mummur_next_mvp?schema=public` | PostgreSQL connection string used by Prisma. |
 | `LLM_PROVIDER` | No | `mock` | Smart AI Singer provider: `mock`, `openai`, `gemini`, `groq`, or `openrouter`. |
-| `LLM_MODEL` | No | `gemini-1.5-flash` | Model name for the selected LLM provider. Leave empty to use the provider default. |
+| `LLM_MODEL` | No | `gemini-2.5-flash` | Model name for the selected LLM provider. Leave empty to use the provider default. |
 | `OPENAI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openai`. |
 | `GEMINI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=gemini`. |
 | `GROQ_API_KEY` | No | empty | Required only when `LLM_PROVIDER=groq`. |
