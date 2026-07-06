@@ -5,14 +5,16 @@ Standalone AI digital-human music content system.
 This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
-- Generate mock 7-day Content Plans.
+- Generate 7-day Content Plans with Mock or OpenAI LLM providers.
 - Prepare manual Suno / MakeBestMusic music prompts.
+- Generate mock music API jobs for future official Music API integration.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
+- Prepare manual publishing records for TikTok, YouTube Shorts, and YouTube.
 
-No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
+Video, TikTok, and YouTube APIs are not called in this MVP. Weekly planning can use OpenAI only when `OPENAI_API_KEY` is configured; otherwise it automatically uses the Mock provider. Music API generation is currently mock-only and does not call unofficial APIs.
 
 ## Requirements
 
@@ -33,6 +35,14 @@ npm install
 ```bash
 copy .env.example .env
 ```
+
+Optional OpenAI configuration:
+
+```env
+OPENAI_API_KEY=""
+```
+
+Leave `OPENAI_API_KEY` empty for local Mock generation. When it is set, choose `OpenAI` in the weekly plan form to generate copy through OpenAI. The app does not log the API key.
 
 3. Start PostgreSQL and create a database matching `DATABASE_URL`.
 
@@ -73,7 +83,7 @@ npm run db:studio
 ## Manual Music Workflow
 
 1. Create a Digital Human with Persona and Consent.
-2. Generate a 7-day Content Plan.
+2. Generate a 7-day Content Plan with Mock or OpenAI.
 3. Open a Content Plan.
 4. Choose Suno or MakeBestMusic.
 5. Copy:
@@ -89,6 +99,22 @@ npm run db:studio
 8. Upload the audio file back to Mummur Next MVP.
 
 This workflow does not use unofficial APIs, browser automation, cookies, tokens, or saved provider accounts.
+
+## Music API Workflow
+
+1. Open a Content Plan.
+2. Use the Music API Provider panel.
+3. Choose `Mock Music API`.
+4. Generate a music API job.
+5. Review job status:
+   - `queued`
+   - `processing`
+   - `completed`
+   - `failed`
+6. Completed jobs store `generatedAudioUrl` and create an audio `PublishAsset`.
+7. Failed jobs can be retried with the Retry button.
+
+Only official API providers or mock API providers should be added here. Do not use unofficial Suno/MakeBestMusic APIs, browser automation, cookies, or account tokens.
 
 ## Manual Video Workflow
 
@@ -111,11 +137,28 @@ This workflow does not use unofficial APIs, browser automation, cookies, tokens,
 
 This workflow does not call video provider APIs, automate login, or store cookies/tokens.
 
+## Manual Publish Workflow
+
+1. Upload a video asset to a Content Plan.
+2. Open the Content Plan.
+3. Choose a platform:
+   - TikTok
+   - YouTube Shorts
+   - YouTube
+4. Enter publish title, description, hashtags, optional scheduled time, and optional failure note.
+5. Save the platform post as `draft`, `ready`, `scheduled`, or `failed`.
+6. After manually publishing on the platform, paste the published URL and mark the post as `published`.
+7. Review publish history entries on the Content Plan.
+
+This workflow does not call TikTok or YouTube APIs, automate posting, or store platform accounts.
+
 ## Future Integrations
 
 Provider abstractions live under `src/services`:
 
+- `LLMProvider`
 - `MusicProvider`
+- `MusicApiProvider`
 - `VideoProvider`
 
 Future official API integrations should add new provider implementations without changing the Content Plan ownership model.

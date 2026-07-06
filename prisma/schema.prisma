@@ -30,8 +30,16 @@ enum AssetType {
 
 enum PublishStatus {
   draft
+  ready
   scheduled
   published
+  failed
+}
+
+enum MusicApiJobStatus {
+  queued
+  processing
+  completed
   failed
 }
 
@@ -121,6 +129,7 @@ model ContentPlan {
   songIdea       SongIdea        @relation(fields: [songIdeaId], references: [id], onDelete: Restrict)
   publishAssets  PublishAsset[]
   platformPosts  PlatformPost[]
+  musicGenerationJobs MusicGenerationJob[]
 
   @@index([digitalHumanId])
   @@index([songIdeaId])
@@ -164,21 +173,65 @@ model PublishAsset {
 }
 
 model PlatformPost {
-  id             String        @id @default(uuid()) @db.Uuid
-  contentPlanId  String        @map("content_plan_id") @db.Uuid
-  platform       TargetPlatform
-  status         PublishStatus @default(draft)
-  platformPostId String?       @map("platform_post_id")
-  postUrl        String?       @map("post_url")
-  publishedAt    DateTime?     @map("published_at") @db.Timestamptz(6)
-  errorMessage   String?       @map("error_message")
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz(6)
-  contentPlan    ContentPlan   @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+  id                 String                @id @default(uuid()) @db.Uuid
+  contentPlanId      String                @map("content_plan_id") @db.Uuid
+  platform           TargetPlatform
+  status             PublishStatus         @default(draft)
+  publishTitle       String?               @map("publish_title")
+  publishDescription String?               @map("publish_description")
+  hashtags           String[]              @default([])
+  scheduledAt        DateTime?             @map("scheduled_at") @db.Timestamptz(6)
+  publishedUrl       String?               @map("published_url")
+  platformPostId     String?               @map("platform_post_id")
+  postUrl            String?               @map("post_url")
+  publishedAt        DateTime?             @map("published_at") @db.Timestamptz(6)
+  errorMessage       String?               @map("error_message")
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?             @map("deleted_at") @db.Timestamptz(6)
+  contentPlan        ContentPlan           @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+  histories          PlatformPostHistory[]
 
   @@index([contentPlanId])
   @@index([platform])
   @@index([status])
+  @@unique([contentPlanId, platform])
   @@map("platform_posts")
+}
+
+model PlatformPostHistory {
+  id             String         @id @default(uuid()) @db.Uuid
+  platformPostId String         @map("platform_post_id") @db.Uuid
+  status         PublishStatus
+  note           String?
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  platformPost   PlatformPost   @relation(fields: [platformPostId], references: [id], onDelete: Restrict)
+
+  @@index([platformPostId])
+  @@index([status])
+  @@map("platform_post_histories")
+}
+
+model MusicGenerationJob {
+  id                String            @id @default(uuid()) @db.Uuid
+  contentPlanId     String            @map("content_plan_id") @db.Uuid
+  provider          String
+  status            MusicApiJobStatus @default(queued)
+  providerConfig    Json?             @map("provider_config")
+  requestPayload    Json?             @map("request_payload")
+  generatedAudioUrl String?           @map("generated_audio_url")
+  errorMessage      String?           @map("error_message")
+  retryOfJobId      String?           @map("retry_of_job_id") @db.Uuid
+  startedAt         DateTime?         @map("started_at") @db.Timestamptz(6)
+  completedAt       DateTime?         @map("completed_at") @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  contentPlan       ContentPlan       @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+
+  @@index([contentPlanId])
+  @@index([provider])
+  @@index([status])
+  @@index([retryOfJobId])
+  @@map("music_generation_jobs")
 }

@@ -1,10 +1,14 @@
-import type { ContentStatus } from "@prisma/client";
+import type { ContentStatus, PublishStatus, TargetPlatform } from "@prisma/client";
 import Link from "next/link";
 
 import {
   addConsentRecordAction,
   createDigitalHumanAction,
   generateWeeklyPlanAction,
+  markPlatformPostPublishedAction,
+  retryMusicApiJobAction,
+  savePlatformPostAction,
+  startMusicApiJobAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -13,12 +17,22 @@ import {
 } from "@/app/actions";
 import { CopyFields } from "@/components/copy-fields";
 import { prisma } from "@/lib/prisma";
+import { llmProviderOptions } from "@/services/llm-provider";
+import { isRetryableMusicApiStatus, musicApiProviders } from "@/services/music-api-provider";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
+import { defaultPublishCopy, publishPlatforms, publishStatuses } from "@/services/publish-workflow";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
 
 export const dynamic = "force-dynamic";
 
 const statuses: ContentStatus[] = ["idea", "lyrics", "music_generated", "video_ready", "published"];
+const editablePublishStatuses: PublishStatus[] = publishStatuses.filter((status) => status !== "published");
+
+const platformLabels: Record<TargetPlatform, string> = {
+  tiktok: "TikTok",
+  youtube_shorts: "YouTube Shorts",
+  youtube: "YouTube"
+};
 
 type SelectedPlan = Awaited<ReturnType<typeof loadSelectedPlan>>;
 
@@ -33,7 +47,7 @@ export default async function Home({
   }>;
 }) {
   const params = await searchParams;
-  const [digitalHumans, contentPlans, selectedHuman, selectedPlan] = await Promise.all([
+  const [digitalHumans, contentPlans, publishStats, selectedHuman, selectedPlan] = await Promise.all([
     prisma.digitalHuman.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
@@ -41,6 +55,7 @@ export default async function Home({
       include: { persona: true, consentRecords: { where: { deletedAt: null }, take: 5 } }
     }),
     loadContentPlans(),
+    loadPublishStats(),
     params?.digitalHumanId ? loadSelectedHuman(params.digitalHumanId) : null,
     params?.planId ? loadSelectedPlan(params.planId) : null
   ]);
@@ -51,10 +66,12 @@ export default async function Home({
         <header>
           <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
           <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-            Standalone AI digital-human music content system. No Back Office modules, no real AI
-            provider API calls, no cookies or tokens.
+            Standalone AI digital-human music content system. No Back Office modules, no media
+            provider automation, no cookies or tokens.
           </p>
         </header>
+
+        <PublishStatsPanel stats={publishStats} />
 
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <section className="space-y-4">
@@ -142,6 +159,21 @@ async function loadSelectedPlan(id: string) {
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         take: 20
+      },
+      platformPosts: {
+        where: { deletedAt: null },
+        orderBy: [{ platform: "asc" }, { createdAt: "desc" }],
+        include: {
+          histories: {
+            orderBy: { createdAt: "desc" },
+            take: 10
+          }
+        }
+      },
+      musicGenerationJobs: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 20
       }
     }
   });
@@ -152,8 +184,41 @@ async function loadContentPlans() {
     where: { deletedAt: null },
     orderBy: [{ scheduledDate: "asc" }, { createdAt: "asc" }],
     take: 100,
-    include: { digitalHuman: true, songIdea: true }
+    include: { digitalHuman: true, songIdea: true, platformPosts: { where: { deletedAt: null } } }
   });
+}
+
+async function loadPublishStats() {
+  const counts = await prisma.platformPost.groupBy({
+    by: ["status"],
+    where: { deletedAt: null, status: { in: ["ready", "scheduled", "published"] } },
+    _count: true
+  });
+
+  return {
+    ready: counts.find((count) => count.status === "ready")?._count ?? 0,
+    scheduled: counts.find((count) => count.status === "scheduled")?._count ?? 0,
+    published: counts.find((count) => count.status === "published")?._count ?? 0
+  };
+}
+
+function PublishStatsPanel({ stats }: { stats: Awaited<ReturnType<typeof loadPublishStats>> }) {
+  return (
+    <section className="grid gap-3 sm:grid-cols-3">
+      <Metric label="Ready" value={stats.ready} />
+      <Metric label="Scheduled" value={stats.scheduled} />
+      <Metric label="Published" value={stats.published} />
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+      <div className="text-xs uppercase text-zinc-500">{label}</div>
+      <div className="mt-2 text-2xl font-semibold">{value}</div>
+    </div>
+  );
 }
 
 function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>> }) {
@@ -189,7 +254,16 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
 
           <form action={generateWeeklyPlanAction} className="rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="digitalHumanId" value={human.id} />
-            <Submit>Generate 7-day Plan</Submit>
+            <Select label="LLM provider" name="llmProvider" defaultValue="mock">
+              {llmProviderOptions.map((provider) => (
+                <option key={provider.providerKey} value={provider.providerKey}>
+                  {provider.providerName}
+                </option>
+              ))}
+            </Select>
+            <div className="mt-3">
+              <Submit>Generate 7-day Plan</Submit>
+            </div>
           </form>
 
           <div className="rounded-md border border-zinc-800 p-3">
@@ -337,6 +411,8 @@ function SelectedPlanPanel({
             <Submit>Upload Music</Submit>
           </form>
 
+          <MusicApiJobsPanel contentPlan={contentPlan} />
+
           <form action={uploadVideoAssetAction} className="grid gap-3 rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="contentPlanId" value={contentPlan.id} />
             <input type="hidden" name="provider" value={videoProvider.providerKey} />
@@ -347,9 +423,207 @@ function SelectedPlanPanel({
 
           <AssetList title="Music Assets" assets={audioAssets} mediaType="audio" />
           <AssetList title="Video Assets" assets={videoAssets} mediaType="video" />
+          <PublishWorkflowPanel contentPlan={contentPlan} hasVideo={videoAssets.length > 0} />
         </aside>
       </div>
     </Panel>
+  );
+}
+
+function MusicApiJobsPanel({ contentPlan }: { contentPlan: NonNullable<SelectedPlan> }) {
+  return (
+    <div className="space-y-3 rounded-md border border-zinc-800 p-3">
+      <div>
+        <div className="text-sm font-medium">Music API Provider</div>
+        <p className="mt-1 text-xs text-zinc-500">Official API or mock API only. No cookies or browser login.</p>
+      </div>
+
+      <form action={startMusicApiJobAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+        <input type="hidden" name="contentPlanId" value={contentPlan.id} />
+        <Select label="API provider" name="provider" defaultValue={musicApiProviders[0].providerKey}>
+          {musicApiProviders.map((provider) => (
+            <option key={provider.providerKey} value={provider.providerKey}>
+              {provider.providerName}
+            </option>
+          ))}
+        </Select>
+        <Submit>Generate Music via API</Submit>
+      </form>
+
+      {contentPlan.musicGenerationJobs.length === 0 ? (
+        <p className="text-sm text-zinc-400">No music API jobs yet.</p>
+      ) : (
+        <div className="grid gap-3">
+          {contentPlan.musicGenerationJobs.map((job) => (
+            <div key={job.id} className="rounded border border-zinc-800 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium">{job.provider}</div>
+                  <div className="text-xs text-zinc-500">Status: {job.status}</div>
+                </div>
+                {job.generatedAudioUrl ? (
+                  <a className="text-xs text-zinc-300 underline" href={job.generatedAudioUrl}>
+                    generatedAudioUrl
+                  </a>
+                ) : null}
+              </div>
+              {job.errorMessage ? <p className="mt-2 text-xs text-red-300">{job.errorMessage}</p> : null}
+              <div className="mt-2 text-xs text-zinc-500">
+                Provider config: {compactJson(job.providerConfig)}
+              </div>
+              {isRetryableMusicApiStatus(job.status) ? (
+                <form action={retryMusicApiJobAction} className="mt-3">
+                  <input type="hidden" name="id" value={job.id} />
+                  <Submit>Retry</Submit>
+                </form>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PublishWorkflowPanel({
+  contentPlan,
+  hasVideo
+}: {
+  contentPlan: NonNullable<SelectedPlan>;
+  hasVideo: boolean;
+}) {
+  const defaults = defaultPublishCopy(contentPlan);
+
+  return (
+    <div className="space-y-4 rounded-md border border-zinc-800 p-3">
+      <div>
+        <div className="text-sm font-medium">Publish Workflow</div>
+        <p className="mt-1 text-xs text-zinc-500">Manual preparation only. No TikTok or YouTube APIs are called.</p>
+      </div>
+
+      {!hasVideo ? (
+        <p className="text-sm text-zinc-400">Upload a video asset before preparing platform publishing.</p>
+      ) : (
+        <>
+          <PublishPostForm
+            contentPlanId={contentPlan.id}
+            platform={contentPlan.targetPlatform}
+            status="ready"
+            publishTitle={defaults.publishTitle}
+            publishDescription={defaults.publishDescription}
+            hashtags={defaults.hashtags}
+            submitLabel="Save Publish Prep"
+          />
+
+          <div className="space-y-3">
+            <div className="text-sm font-medium">Publish History</div>
+            {contentPlan.platformPosts.length === 0 ? (
+              <p className="text-sm text-zinc-400">No platform posts yet.</p>
+            ) : (
+              contentPlan.platformPosts.map((post) => (
+                <div key={post.id} className="space-y-3 rounded border border-zinc-800 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-medium">{platformLabels[post.platform]}</div>
+                      <div className="text-xs text-zinc-500">Status: {post.status}</div>
+                    </div>
+                    {post.publishedUrl ? (
+                      <a className="text-xs text-zinc-300 underline" href={post.publishedUrl}>
+                        Published URL
+                      </a>
+                    ) : null}
+                  </div>
+
+                  <PublishPostForm
+                    contentPlanId={contentPlan.id}
+                    platform={post.platform}
+                    status={post.status === "published" ? "ready" : post.status}
+                    publishTitle={post.publishTitle ?? defaults.publishTitle}
+                    publishDescription={post.publishDescription ?? defaults.publishDescription}
+                    hashtags={post.hashtags.length > 0 ? post.hashtags : defaults.hashtags}
+                    scheduledAt={post.scheduledAt}
+                    errorMessage={post.errorMessage ?? ""}
+                    submitLabel="Update Publish Record"
+                  />
+
+                  <form action={markPlatformPostPublishedAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+                    <input type="hidden" name="id" value={post.id} />
+                    <Input label="Published URL" name="publishedUrl" defaultValue={post.publishedUrl ?? ""} required />
+                    <Submit>Mark Published</Submit>
+                  </form>
+
+                  {post.histories.length === 0 ? (
+                    <p className="text-xs text-zinc-500">No history entries yet.</p>
+                  ) : (
+                    <ul className="space-y-1 text-xs text-zinc-500">
+                      {post.histories.map((history) => (
+                        <li key={history.id}>
+                          {formatDateTime(history.createdAt)} / {history.status}
+                          {history.note ? ` / ${history.note}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PublishPostForm({
+  contentPlanId,
+  platform,
+  status,
+  publishTitle,
+  publishDescription,
+  hashtags,
+  scheduledAt,
+  errorMessage,
+  submitLabel
+}: {
+  contentPlanId: string;
+  platform: TargetPlatform;
+  status: Exclude<PublishStatus, "published">;
+  publishTitle: string;
+  publishDescription: string;
+  hashtags: string[];
+  scheduledAt?: Date | null;
+  errorMessage?: string;
+  submitLabel: string;
+}) {
+  return (
+    <form action={savePlatformPostAction} className="grid gap-3 rounded border border-zinc-800 p-3">
+      <input type="hidden" name="contentPlanId" value={contentPlanId} />
+      <Select label="Platform" name="platform" defaultValue={platform}>
+        {publishPlatforms.map((option) => (
+          <option key={option} value={option}>
+            {platformLabels[option]}
+          </option>
+        ))}
+      </Select>
+      <Select label="Publish status" name="status" defaultValue={status}>
+        {editablePublishStatuses.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </Select>
+      <Input label="Publish title" name="publishTitle" defaultValue={publishTitle} required />
+      <Textarea label="Publish description" name="publishDescription" defaultValue={publishDescription} required />
+      <Textarea label="Hashtags" name="hashtags" defaultValue={hashtags.join(" ")} required />
+      <Input
+        label="Scheduled at"
+        name="scheduledAt"
+        type="datetime-local"
+        defaultValue={scheduledAt ? formatDateTimeInput(scheduledAt) : ""}
+      />
+      <Textarea label="Failure note" name="errorMessage" defaultValue={errorMessage ?? ""} />
+      <Submit>{submitLabel}</Submit>
+    </form>
   );
 }
 
@@ -405,6 +679,11 @@ function ContentPlansPanel({
                 <span>{formatDate(plan.scheduledDate)}</span>
                 <span>{plan.targetPlatform}</span>
                 <span>{plan.status}</span>
+                {plan.platformPosts.length > 0 ? (
+                  <span>
+                    publish: {plan.platformPosts.map((post) => `${platformLabels[post.platform]} ${post.status}`).join(", ")}
+                  </span>
+                ) : null}
                 <span>{plan.digitalHuman.displayName}</span>
               </div>
               <div className="mt-2 font-medium">{plan.title}</div>
@@ -440,7 +719,7 @@ function AssetList({
         <div className="mt-3 grid gap-3">
           {assets.map((asset) => {
             const metadata = assetMetadata(asset.metadata);
-            const src = `/api/assets/${asset.id}`;
+            const src = asset.assetUrl.startsWith("http") ? asset.assetUrl : `/api/assets/${asset.id}`;
             return (
               <div key={asset.id} className="rounded border border-zinc-800 p-3">
                 <div className="text-sm">{metadata.originalName ?? asset.assetUrl}</div>
@@ -516,6 +795,11 @@ function assetMetadata(metadata: unknown) {
   return metadata as { originalName?: string };
 }
 
+function compactJson(value: unknown) {
+  if (!value || typeof value !== "object") return "not configured";
+  return JSON.stringify(value);
+}
+
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -523,6 +807,21 @@ function formatDate(date: Date) {
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
+}
+
+function formatDateTime(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC"
+  }).format(date);
+}
+
+function formatDateTimeInput(date: Date) {
+  return date.toISOString().slice(0, 16);
 }
 
 function isUuid(value: string) {
