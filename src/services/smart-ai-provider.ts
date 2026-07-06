@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 
 import { getEnv, type EnvSource } from "@/lib/env";
+import type { LanguageSettings } from "@/services/global-language";
 import type { SmartAIOutput, SmartAISchema } from "@/services/smart-ai-schemas";
 
 export type SmartAIUsage = {
@@ -21,6 +22,7 @@ export type SmartAIProviderRequest<T extends SmartAIOutput> = {
   userPrompt: string;
   schema: SmartAISchema<T>;
   fallbackOutput: T;
+  languageSettings?: LanguageSettings;
 };
 
 export interface LLMProvider {

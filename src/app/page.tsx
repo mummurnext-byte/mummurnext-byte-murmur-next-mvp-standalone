@@ -7,6 +7,7 @@ import {
   createDigitalHumanAction,
   generateSmartSingerProfileAction,
   generateWeeklyPlanAction,
+  updateContentPlanLanguageAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
   updateDigitalHumanAction,
@@ -14,7 +15,15 @@ import {
   uploadVideoAssetAction
 } from "@/app/actions";
 import { CopyFields } from "@/components/copy-fields";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { prisma } from "@/lib/prisma";
+import { getUICopy, type UICopy } from "@/lib/ui-copy";
+import { getRequestUILanguage } from "@/lib/ui-language-server";
+import {
+  inputLanguageOptions,
+  outputLanguageOptions,
+  targetMarketOptions
+} from "@/services/global-language";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
 
@@ -35,6 +44,8 @@ export default async function Home({
   }>;
 }) {
   const params = await searchParams;
+  const uiLanguage = await getRequestUILanguage();
+  const ui = getUICopy(uiLanguage);
   const [digitalHumans, contentPlans, selectedHuman, selectedPlan] = await Promise.all([
     prisma.digitalHuman.findMany({
       where: { deletedAt: null },
@@ -50,23 +61,23 @@ export default async function Home({
   return (
     <main className="min-h-screen bg-zinc-950 p-6 text-zinc-100">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header>
-          <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
-          <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-            Standalone AI digital-human music content system. Smart AI Singer can use a configured
-            LLM provider; music, video, and publishing providers remain manual.
-          </p>
-          <Link
-            href="/admin/deployment-checklist"
-            className="mt-3 inline-flex rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500"
-          >
-            Deployment Checklist
-          </Link>
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
+            <p className="mt-2 max-w-3xl text-sm text-zinc-400">{ui.description}</p>
+            <Link
+              href="/admin/deployment-checklist"
+              className="mt-3 inline-flex rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-500"
+            >
+              {ui.deploymentChecklist}
+            </Link>
+          </div>
+          <LanguageSwitcher currentLanguage={uiLanguage} />
         </header>
 
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <section className="space-y-4">
-            <Panel title="Create Digital Human">
+            <Panel title={ui.createDigitalHuman}>
               <form action={createDigitalHumanAction} className="grid gap-3">
                 <Input label="Display name" name="displayName" required />
                 <Input label="Legal name" name="legalName" />
@@ -79,6 +90,7 @@ export default async function Home({
                 <Input label="Audience" name="audience" defaultValue="short-video music listeners" required />
                 <Input label="Music style" name="musicStyle" defaultValue="electronic pop" required />
                 <Input label="Visual style" name="visualStyle" defaultValue="clean studio portrait" required />
+                <LanguagePreferenceFields ui={ui} />
                 <Input label="Consented name" name="consentedName" />
                 <Input label="Consent document URL" name="documentUrl" />
                 <Input label="Consent scope" name="scope" defaultValue="AI music and digital-human video" />
@@ -88,10 +100,10 @@ export default async function Home({
               </form>
             </Panel>
 
-            <Panel title="Digital Humans">
+            <Panel title={ui.digitalHumans}>
               <div className="grid gap-2">
                 {digitalHumans.length === 0 ? (
-                  <p className="text-sm text-zinc-400">No digital humans yet.</p>
+                  <p className="text-sm text-zinc-400">{ui.noDigitalHumans}</p>
                 ) : (
                   digitalHumans.map((human) => (
                     <Link
@@ -112,15 +124,16 @@ export default async function Home({
           </section>
 
           <section className="space-y-4">
-            {selectedHuman ? <SelectedHumanPanel human={selectedHuman} /> : null}
+            {selectedHuman ? <SelectedHumanPanel human={selectedHuman} ui={ui} /> : null}
             {selectedPlan ? (
               <SelectedPlanPanel
                 contentPlan={selectedPlan}
                 selectedMusicProvider={params?.musicProvider}
                 selectedVideoProvider={params?.videoProvider}
+                ui={ui}
               />
             ) : null}
-            <ContentPlansPanel contentPlans={contentPlans} />
+            <ContentPlansPanel contentPlans={contentPlans} ui={ui} />
           </section>
         </div>
       </div>
@@ -175,7 +188,13 @@ async function loadContentPlans() {
   });
 }
 
-function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>> }) {
+function SelectedHumanPanel({
+  human,
+  ui
+}: {
+  human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>>;
+  ui: UICopy;
+}) {
   return (
     <Panel title={`Digital Human: ${human.displayName}`}>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -192,7 +211,13 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
           <Input label="Audience" name="audience" defaultValue={human.persona?.audience ?? ""} required />
           <Input label="Music style" name="musicStyle" defaultValue={human.persona?.musicStyle ?? ""} required />
           <Input label="Visual style" name="visualStyle" defaultValue={human.persona?.visualStyle ?? ""} required />
-          <Submit>Save Digital Human</Submit>
+          <LanguagePreferenceFields
+            ui={ui}
+            inputLanguage={human.persona?.inputLanguage}
+            outputLanguage={human.persona?.outputLanguage}
+            targetMarket={human.persona?.targetMarket}
+          />
+          <Submit>{ui.saveDigitalHuman}</Submit>
         </form>
 
         <div className="space-y-4">
@@ -208,12 +233,18 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
 
           <form action={generateWeeklyPlanAction} className="rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="digitalHumanId" value={human.id} />
-            <Submit>Generate 7-day Plan</Submit>
+            <Submit>{ui.generateWeeklyPlan}</Submit>
           </form>
 
-          <form action={generateSmartSingerProfileAction} className="rounded-md border border-zinc-800 p-3">
+          <form action={generateSmartSingerProfileAction} className="grid gap-3 rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="digitalHumanId" value={human.id} />
-            <Submit>Generate Smart Singer Profile</Submit>
+            <LanguagePreferenceFields
+              ui={ui}
+              inputLanguage={human.persona?.inputLanguage}
+              outputLanguage={human.persona?.outputLanguage}
+              targetMarket={human.persona?.targetMarket}
+            />
+            <Submit>{ui.generateProfile}</Submit>
           </form>
 
           <div className="rounded-md border border-zinc-800 p-3">
@@ -241,11 +272,13 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
 function SelectedPlanPanel({
   contentPlan,
   selectedMusicProvider,
-  selectedVideoProvider
+  selectedVideoProvider,
+  ui
 }: {
   contentPlan: NonNullable<SelectedPlan>;
   selectedMusicProvider?: string;
   selectedVideoProvider?: string;
+  ui: UICopy;
 }) {
   const audioAssets = contentPlan.publishAssets.filter((asset) => asset.assetType === "audio");
   const videoAssets = contentPlan.publishAssets.filter((asset) => asset.assetType === "video");
@@ -261,7 +294,7 @@ function SelectedPlanPanel({
     <Panel title={`Content Plan: ${contentPlan.title}`}>
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4">
-          <AskSmartSingerPanel contentPlan={contentPlan} selectedVideoProvider={videoProvider.providerKey} />
+          <AskSmartSingerPanel contentPlan={contentPlan} selectedVideoProvider={videoProvider.providerKey} ui={ui} />
 
           <ProviderSelect
             planId={contentPlan.id}
@@ -337,6 +370,21 @@ function SelectedPlanPanel({
         </div>
 
         <aside className="space-y-4">
+          <form action={updateContentPlanLanguageAction} className="grid gap-3 rounded-md border border-zinc-800 p-3">
+            <input type="hidden" name="id" value={contentPlan.id} />
+            <div>
+              <div className="text-sm font-medium">{ui.contentLanguageSettings}</div>
+              <p className="mt-1 text-xs text-zinc-500">{ui.languageNote}</p>
+            </div>
+            <LanguagePreferenceFields
+              ui={ui}
+              inputLanguage={contentPlan.inputLanguage}
+              outputLanguage={contentPlan.outputLanguage}
+              targetMarket={contentPlan.targetMarket}
+            />
+            <Submit>{ui.saveLanguageSettings}</Submit>
+          </form>
+
           <form action={updateContentPlanCopyAction} className="grid gap-3 rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="id" value={contentPlan.id} />
             <Input label="Title" name="title" defaultValue={contentPlan.title} required />
@@ -409,62 +457,57 @@ function SmartSingerProfilePanel({
 
 function AskSmartSingerPanel({
   contentPlan,
-  selectedVideoProvider
+  selectedVideoProvider,
+  ui
 }: {
   contentPlan: NonNullable<SelectedPlan>;
   selectedVideoProvider: string;
+  ui: UICopy;
 }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <div className="text-sm font-medium">Ask Smart Singer</div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <SmartTaskButton contentPlanId={contentPlan.id} task="song_idea">
-          Generate Song Idea
-        </SmartTaskButton>
-        <SmartTaskButton contentPlanId={contentPlan.id} task="lyrics">
-          Generate Lyrics
-        </SmartTaskButton>
-        <SmartTaskButton contentPlanId={contentPlan.id} task="suno_prompt">
-          Generate Suno Prompt
-        </SmartTaskButton>
-        <SmartTaskButton contentPlanId={contentPlan.id} task="makebestmusic_prompt">
-          Generate MakeBestMusic Prompt
-        </SmartTaskButton>
-        <SmartTaskButton contentPlanId={contentPlan.id} task="video_brief" videoProvider={selectedVideoProvider}>
-          Generate Video Brief
-        </SmartTaskButton>
-        <SmartTaskButton contentPlanId={contentPlan.id} task="tiktok_copy">
-          Generate TikTok Copy
-        </SmartTaskButton>
-        <SmartTaskButton contentPlanId={contentPlan.id} task="youtube_copy">
-          Generate YouTube Copy
-        </SmartTaskButton>
-      </div>
+      <div className="text-sm font-medium">{ui.askSmartSinger}</div>
+      <p className="mt-1 text-xs text-zinc-500">{ui.languageNote}</p>
+      <form action={askSmartSingerAction} className="mt-3 grid gap-3">
+        <input type="hidden" name="contentPlanId" value={contentPlan.id} />
+        <input type="hidden" name="videoProvider" value={selectedVideoProvider} />
+        <LanguagePreferenceFields
+          ui={ui}
+          inputLanguage={contentPlan.inputLanguage}
+          outputLanguage={contentPlan.outputLanguage}
+          targetMarket={contentPlan.targetMarket}
+        />
+        <div className="flex flex-wrap gap-2">
+          <SmartTaskButton task="song_idea">{ui.generateSongIdea}</SmartTaskButton>
+          <SmartTaskButton task="lyrics">{ui.generateLyrics}</SmartTaskButton>
+          <SmartTaskButton task="suno_prompt">{ui.generateSunoPrompt}</SmartTaskButton>
+          <SmartTaskButton task="makebestmusic_prompt">{ui.generateMakeBestMusicPrompt}</SmartTaskButton>
+          <SmartTaskButton task="video_brief">{ui.generateVideoBrief}</SmartTaskButton>
+          <SmartTaskButton task="tiktok_copy">{ui.generateTikTokCopy}</SmartTaskButton>
+          <SmartTaskButton task="youtube_copy">{ui.generateYouTubeCopy}</SmartTaskButton>
+        </div>
+      </form>
       <SmartGenerationList generations={contentPlan.smartAIGenerations} />
     </div>
   );
 }
 
 function SmartTaskButton({
-  contentPlanId,
   task,
-  videoProvider,
   children
 }: {
-  contentPlanId: string;
   task: string;
-  videoProvider?: string;
   children: React.ReactNode;
 }) {
   return (
-    <form action={askSmartSingerAction}>
-      <input type="hidden" name="contentPlanId" value={contentPlanId} />
-      <input type="hidden" name="task" value={task} />
-      {videoProvider ? <input type="hidden" name="videoProvider" value={videoProvider} /> : null}
-      <button type="submit" className="rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:border-zinc-500">
-        {children}
-      </button>
-    </form>
+    <button
+      type="submit"
+      name="task"
+      value={task}
+      className="rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:border-zinc-500"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -561,15 +604,55 @@ function ProviderSelect({
   );
 }
 
-function ContentPlansPanel({
-  contentPlans
+function LanguagePreferenceFields({
+  ui,
+  inputLanguage = "auto",
+  outputLanguage = "en",
+  targetMarket = "global"
 }: {
-  contentPlans: Awaited<ReturnType<typeof loadContentPlans>>;
+  ui: UICopy;
+  inputLanguage?: string | null;
+  outputLanguage?: string | null;
+  targetMarket?: string | null;
 }) {
   return (
-    <Panel title="Content Plans">
+    <div className="grid gap-3 md:grid-cols-3">
+      <Select label={ui.inputLanguage} name="inputLanguage" defaultValue={inputLanguage ?? "auto"}>
+        {inputLanguageOptions.map((option) => (
+          <option key={option.key} value={option.key}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+      <Select label={ui.outputLanguage} name="outputLanguage" defaultValue={outputLanguage ?? "en"}>
+        {outputLanguageOptions.map((option) => (
+          <option key={option.key} value={option.key}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+      <Select label={ui.targetMarket} name="targetMarket" defaultValue={targetMarket ?? "global"}>
+        {targetMarketOptions.map((option) => (
+          <option key={option.key} value={option.key}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
+function ContentPlansPanel({
+  contentPlans,
+  ui
+}: {
+  contentPlans: Awaited<ReturnType<typeof loadContentPlans>>;
+  ui: UICopy;
+}) {
+  return (
+    <Panel title={ui.contentPlans}>
       {contentPlans.length === 0 ? (
-        <p className="text-sm text-zinc-400">No content plans yet.</p>
+        <p className="text-sm text-zinc-400">{ui.noContentPlans}</p>
       ) : (
         <div className="grid gap-3">
           {contentPlans.map((plan) => (

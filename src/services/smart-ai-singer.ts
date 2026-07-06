@@ -9,6 +9,13 @@ import type {
 
 import { getEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import {
+  defaultLanguageSettings,
+  languageSettingsFromRecord,
+  localizedText,
+  resolveLanguageSettings,
+  type LanguageSettings
+} from "@/services/global-language";
 import { getSmartLLMProvider, type LLMProvider, type SmartAIUsage } from "@/services/smart-ai-provider";
 import { buildSmartAIPrompt, smartAISystemPrompt } from "@/services/smart-ai-prompts";
 import {
@@ -42,6 +49,7 @@ type StartGenerationInput = {
   model: string;
   digitalHumanId?: string;
   contentPlanId?: string;
+  languageSettings: LanguageSettings;
   inputSummary: string;
 };
 
@@ -103,7 +111,17 @@ export class PrismaSmartAISingerRepository implements SmartAISingerRepository {
 
   async startGeneration(input: StartGenerationInput) {
     return prisma.smartAIGeneration.create({
-      data: input,
+      data: {
+        purpose: input.purpose,
+        provider: input.provider,
+        model: input.model,
+        digitalHumanId: input.digitalHumanId,
+        contentPlanId: input.contentPlanId,
+        inputLanguage: input.languageSettings.inputLanguage,
+        outputLanguage: input.languageSettings.outputLanguage,
+        targetMarket: input.languageSettings.targetMarket,
+        inputSummary: input.inputSummary
+      },
       select: { id: true }
     });
   }
@@ -176,88 +194,102 @@ export class SmartAISingerService {
     private readonly provider: LLMProvider = getSmartLLMProvider()
   ) {}
 
-  async generateSingerConcept(digitalHumanId: string) {
+  async generateSingerConcept(digitalHumanId: string, languageOverrides: Partial<LanguageSettings> = {}) {
     const digitalHuman = await this.requireDigitalHuman(digitalHumanId);
+    const languageSettings = this.languageSettingsForHuman(digitalHuman, languageOverrides);
     const output = await this.runGeneration({
       purpose: "singer_concept",
       digitalHumanId,
+      languageSettings,
       schema: singerConceptSchema,
-      prompt: await this.promptForHuman("singer_concept", digitalHuman),
-      fallbackOutput: mockSingerConcept(digitalHuman)
+      prompt: await this.promptForHuman("singer_concept", digitalHuman, languageSettings),
+      fallbackOutput: mockSingerConcept(digitalHuman, languageSettings)
     });
 
     await this.repository.upsertSingerProfile(digitalHumanId, output, this.provider.provider);
     return output;
   }
 
-  async generateSongIdea(contentPlanId: string) {
+  async generateSongIdea(contentPlanId: string, languageOverrides: Partial<LanguageSettings> = {}) {
     const contentPlan = await this.requireContentPlan(contentPlanId);
+    const languageSettings = this.languageSettingsForPlan(contentPlan, languageOverrides);
     return this.runGeneration({
       purpose: "song_idea",
       digitalHumanId: contentPlan.digitalHumanId,
       contentPlanId,
+      languageSettings,
       schema: songIdeaSchema,
-      prompt: await this.promptForPlan("song_idea", contentPlan),
-      fallbackOutput: mockSongIdea(contentPlan)
+      prompt: await this.promptForPlan("song_idea", contentPlan, languageSettings),
+      fallbackOutput: mockSongIdea(contentPlan, languageSettings)
     });
   }
 
-  async generateLyrics(contentPlanId: string) {
+  async generateLyrics(contentPlanId: string, languageOverrides: Partial<LanguageSettings> = {}) {
     const contentPlan = await this.requireContentPlan(contentPlanId);
+    const languageSettings = this.languageSettingsForPlan(contentPlan, languageOverrides);
     return this.runGeneration({
       purpose: "lyrics",
       digitalHumanId: contentPlan.digitalHumanId,
       contentPlanId,
+      languageSettings,
       schema: lyricsSchema,
-      prompt: await this.promptForPlan("lyrics", contentPlan),
-      fallbackOutput: mockLyrics(contentPlan)
+      prompt: await this.promptForPlan("lyrics", contentPlan, languageSettings),
+      fallbackOutput: mockLyrics(contentPlan, languageSettings)
     });
   }
 
-  async generateMusicPrompt(contentPlanId: string, provider: string) {
+  async generateMusicPrompt(contentPlanId: string, provider: string, languageOverrides: Partial<LanguageSettings> = {}) {
     const contentPlan = await this.requireContentPlan(contentPlanId);
+    const languageSettings = this.languageSettingsForPlan(contentPlan, languageOverrides);
     return this.runGeneration({
       purpose: "music_prompt",
       digitalHumanId: contentPlan.digitalHumanId,
       contentPlanId,
+      languageSettings,
       schema: musicPromptSchema,
-      prompt: await this.promptForPlan("music_prompt", contentPlan, { provider }),
-      fallbackOutput: mockMusicPrompt(contentPlan, provider)
+      prompt: await this.promptForPlan("music_prompt", contentPlan, languageSettings, { provider }),
+      fallbackOutput: mockMusicPrompt(contentPlan, provider, languageSettings)
     });
   }
 
-  async generateVideoBrief(contentPlanId: string, videoProvider: string) {
+  async generateVideoBrief(contentPlanId: string, videoProvider: string, languageOverrides: Partial<LanguageSettings> = {}) {
     const contentPlan = await this.requireContentPlan(contentPlanId);
+    const languageSettings = this.languageSettingsForPlan(contentPlan, languageOverrides);
     return this.runGeneration({
       purpose: "video_brief",
       digitalHumanId: contentPlan.digitalHumanId,
       contentPlanId,
+      languageSettings,
       schema: videoBriefSchema,
-      prompt: await this.promptForPlan("video_brief", contentPlan, { provider: videoProvider }),
-      fallbackOutput: mockVideoBrief(contentPlan, videoProvider)
+      prompt: await this.promptForPlan("video_brief", contentPlan, languageSettings, { provider: videoProvider }),
+      fallbackOutput: mockVideoBrief(contentPlan, videoProvider, languageSettings)
     });
   }
 
-  async generatePublishCopy(contentPlanId: string, platform: TargetPlatform) {
+  async generatePublishCopy(contentPlanId: string, platform: TargetPlatform, languageOverrides: Partial<LanguageSettings> = {}) {
     const contentPlan = await this.requireContentPlan(contentPlanId);
+    const languageSettings = this.languageSettingsForPlan(contentPlan, languageOverrides);
     return this.runGeneration({
       purpose: "publish_copy",
       digitalHumanId: contentPlan.digitalHumanId,
       contentPlanId,
+      languageSettings,
       schema: publishCopySchema,
-      prompt: await this.promptForPlan("publish_copy", contentPlan, { platform }),
-      fallbackOutput: mockPublishCopy(contentPlan, platform)
+      prompt: await this.promptForPlan("publish_copy", contentPlan, languageSettings, { platform }),
+      fallbackOutput: mockPublishCopy(contentPlan, platform, languageSettings)
     });
   }
 
-  async suggestNextContent(digitalHumanId: string) {
+  async suggestNextContent(digitalHumanId: string, languageOverrides: Partial<LanguageSettings> = {}) {
     const digitalHuman = await this.requireDigitalHuman(digitalHumanId);
+    const languageSettings = this.languageSettingsForHuman(digitalHuman, languageOverrides);
     return this.runGeneration({
       purpose: "next_content",
       digitalHumanId,
+      languageSettings,
       schema: nextContentSchema,
-      prompt: await this.promptForHuman("next_content", digitalHuman),
-      fallbackOutput: mockNextContent()
+      prompt: await this.promptForHuman("next_content", digitalHuman, languageSettings),
+      fallbackOutput: mockNextContent(languageSettings)
     });
   }
 
@@ -265,6 +297,7 @@ export class SmartAISingerService {
     purpose: SmartAIPurpose;
     digitalHumanId?: string;
     contentPlanId?: string;
+    languageSettings: LanguageSettings;
     schema: SmartAISchema<T>;
     prompt: string;
     fallbackOutput: T;
@@ -276,6 +309,7 @@ export class SmartAISingerService {
       model: this.provider.model,
       digitalHumanId: input.digitalHumanId,
       contentPlanId: input.contentPlanId,
+      languageSettings: input.languageSettings,
       inputSummary: summarizePrompt(input.prompt)
     });
 
@@ -284,7 +318,8 @@ export class SmartAISingerService {
         systemPrompt: smartAISystemPrompt,
         userPrompt: input.prompt,
         schema: input.schema,
-        fallbackOutput: input.fallbackOutput
+        fallbackOutput: input.fallbackOutput,
+        languageSettings: input.languageSettings
       });
       const estimatedCostUsd = estimateCostUsd(result.usage);
 
@@ -327,9 +362,14 @@ export class SmartAISingerService {
     return contentPlan;
   }
 
-  private async promptForHuman(purpose: SmartAIPurpose, digitalHuman: DigitalHumanContext) {
+  private async promptForHuman(
+    purpose: SmartAIPurpose,
+    digitalHuman: DigitalHumanContext,
+    languageSettings: LanguageSettings
+  ) {
     return buildSmartAIPrompt({
       purpose,
+      languageSettings,
       digitalHuman,
       historySummary: await this.repository.summarizeHistory(digitalHuman.id)
     });
@@ -338,10 +378,12 @@ export class SmartAISingerService {
   private async promptForPlan(
     purpose: SmartAIPurpose,
     contentPlan: ContentPlanContext,
+    languageSettings: LanguageSettings,
     options: { provider?: string; platform?: string } = {}
   ) {
     return buildSmartAIPrompt({
       purpose,
+      languageSettings,
       digitalHuman: contentPlan.digitalHuman,
       contentPlan,
       provider: options.provider,
@@ -349,35 +391,81 @@ export class SmartAISingerService {
       historySummary: await this.repository.summarizeHistory(contentPlan.digitalHumanId)
     });
   }
+
+  private languageSettingsForHuman(
+    digitalHuman: DigitalHumanContext,
+    overrides: Partial<LanguageSettings>
+  ): LanguageSettings {
+    return resolveLanguageSettings(overrides, languageSettingsFromRecord(digitalHuman.persona));
+  }
+
+  private languageSettingsForPlan(
+    contentPlan: ContentPlanContext,
+    overrides: Partial<LanguageSettings>
+  ): LanguageSettings {
+    return resolveLanguageSettings(
+      overrides,
+      resolveLanguageSettings(languageSettingsFromRecord(contentPlan), languageSettingsFromRecord(contentPlan.digitalHuman.persona))
+    );
+  }
 }
 
-function mockSingerConcept(digitalHuman: DigitalHumanContext): SingerConceptOutput {
+function mockSingerConcept(digitalHuman: DigitalHumanContext, languageSettings: LanguageSettings): SingerConceptOutput {
   const persona = digitalHuman.persona;
   return {
-    positioning: `${digitalHuman.displayName} is a short-form AI singer built around ${persona?.archetype ?? "a focused creator persona"}.`,
+    positioning: localizedText(
+      languageSettings,
+      `${digitalHuman.displayName} is a short-form AI singer built around ${persona?.archetype ?? "a focused creator persona"}.`,
+      `${digitalHuman.displayName} 是围绕 ${persona?.archetype ?? "清晰创作者人设"} 打造的短视频 AI 歌手。`,
+      `${digitalHuman.displayName} คือ AI singer สำหรับวิดีโอสั้นที่สร้างจากคาแรกเตอร์ ${persona?.archetype ?? "ครีเอเตอร์ที่ชัดเจน"}`
+    ),
     personaSummary: persona?.backstory ?? "Original AI music persona.",
     musicStyle: persona?.musicStyle ?? "electronic pop",
     audience: persona?.audience ?? "short-video music listeners",
-    contentDirection: "Release hook-first songs with clean digital-human visuals and repeatable weekly themes.",
-    contentPillars: ["hook-first singles", "digital-human performance", "platform-native captions"]
+    contentDirection: localizedText(
+      languageSettings,
+      "Release hook-first songs with clean digital-human visuals and repeatable weekly themes.",
+      "发布以副歌钩子为核心的歌曲，搭配清晰数字人视觉和可复用周主题。",
+      "ปล่อยเพลงที่มีฮุกชัด พร้อมภาพดิจิทัลฮิวแมนสะอาดตาและธีมรายสัปดาห์ที่นำกลับมาใช้ได้"
+    ),
+    contentPillars: localizedList(languageSettings, [
+      ["hook-first singles", "以钩子为核心的单曲", "เพลงสั้นที่ฮุกมาก่อน"],
+      ["digital-human performance", "数字人表演", "การแสดงของดิจิทัลฮิวแมน"],
+      ["platform-native captions", "平台原生文案", "แคปชันที่เข้ากับแพลตฟอร์ม"]
+    ])
   };
 }
 
-function mockSongIdea(contentPlan: ContentPlanContext): SongIdeaOutput {
+function mockSongIdea(contentPlan: ContentPlanContext, languageSettings: LanguageSettings = defaultLanguageSettings): SongIdeaOutput {
   return {
     songTitle: contentPlan.title,
     theme: contentPlan.songIdea.theme,
-    lyricsDirection: contentPlan.songIdea.lyricsDirection,
-    hook: `Turn ${contentPlan.songIdea.theme} into a repeatable chorus line.`,
-    videoScript: contentPlan.songIdea.videoScript,
+    lyricsDirection: localizedText(
+      languageSettings,
+      contentPlan.songIdea.lyricsDirection,
+      `围绕 ${contentPlan.songIdea.theme} 写一句适合短视频循环的中文副歌钩子。`,
+      `เขียนฮุกภาษาไทยเกี่ยวกับ ${contentPlan.songIdea.theme} ให้จำง่ายและเหมาะกับวิดีโอสั้น`
+    ),
+    hook: localizedText(
+      languageSettings,
+      `Turn ${contentPlan.songIdea.theme} into a repeatable chorus line.`,
+      `把 ${contentPlan.songIdea.theme} 变成一句能循环传播的副歌。`,
+      `เปลี่ยน ${contentPlan.songIdea.theme} ให้เป็นท่อนฮุกที่วนซ้ำแล้วติดหู`
+    ),
+    videoScript: localizedText(
+      languageSettings,
+      contentPlan.songIdea.videoScript,
+      "开场直视镜头，切到副歌高光，结尾做成可循环短视频。",
+      "เปิดด้วยการมองกล้อง ตัดเข้าช่วงฮุก แล้วจบแบบวนลูปได้"
+    ),
     targetPlatform: contentPlan.targetPlatform
   };
 }
 
-function mockLyrics(contentPlan: ContentPlanContext): LyricsOutput {
-  return {
-    songTitle: contentPlan.title,
-    lyrics: [
+function mockLyrics(contentPlan: ContentPlanContext, languageSettings: LanguageSettings = defaultLanguageSettings): LyricsOutput {
+  const lyrics = localizedText(
+    languageSettings,
+    [
       "[Verse]",
       `${titleCase(contentPlan.songIdea.theme)} in the neon light`,
       "I keep the signal burning bright",
@@ -386,58 +474,149 @@ function mockLyrics(contentPlan: ContentPlanContext): LyricsOutput {
       `This is the hook for ${contentPlan.title}`,
       "Say it once and let it loop all night"
     ].join("\n"),
-    hook: `This is the hook for ${contentPlan.title}`,
-    hashtags: contentPlan.hashtags
-  };
-}
-
-function mockMusicPrompt(contentPlan: ContentPlanContext, provider: string): MusicPromptOutput {
+    [
+      "[主歌]",
+      `${contentPlan.songIdea.theme} 在霓虹里发光`,
+      "我把信号稳稳点亮",
+      "",
+      "[副歌]",
+      `${contentPlan.title} 的钩子响起`,
+      "唱一次就让它整夜循环"
+    ].join("\n"),
+    [
+      "[Verse]",
+      `${contentPlan.songIdea.theme} ใต้แสงนีออน`,
+      "ฉันส่งสัญญาณให้ชัดเจน",
+      "",
+      "[Chorus]",
+      `นี่คือฮุกของ ${contentPlan.title}`,
+      "ร้องครั้งเดียวแล้วให้มันวนทั้งคืน"
+    ].join("\n")
+  );
   return {
     songTitle: contentPlan.title,
-    lyrics: mockLyrics(contentPlan).lyrics,
-    genre: contentPlan.digitalHuman.persona?.musicStyle ?? "pop",
-    mood: "confident",
-    stylePrompt: `${provider} prompt: clean short-form ${contentPlan.digitalHuman.persona?.musicStyle ?? "pop"}, strong hook, original melody.`,
-    hook: `A memorable hook about ${contentPlan.songIdea.theme}.`,
-    duration: contentPlan.targetPlatform === "youtube" ? "90 seconds" : "45 seconds",
-    songPrompt: `Create an original song for ${contentPlan.digitalHuman.displayName}: ${contentPlan.songIdea.musicPrompt}`,
+    lyrics,
+    hook: localizedText(
+      languageSettings,
+      `This is the hook for ${contentPlan.title}`,
+      `${contentPlan.title} 的记忆点副歌`,
+      `ฮุกจำง่ายของ ${contentPlan.title}`
+    ),
     hashtags: contentPlan.hashtags
   };
 }
 
-function mockVideoBrief(contentPlan: ContentPlanContext, videoProvider: string): VideoBriefOutput {
+function mockMusicPrompt(
+  contentPlan: ContentPlanContext,
+  provider: string,
+  languageSettings: LanguageSettings = defaultLanguageSettings
+): MusicPromptOutput {
   return {
-    videoBrief: `${videoProvider} digital-human performance for ${contentPlan.title}.`,
+    songTitle: contentPlan.title,
+    lyrics: mockLyrics(contentPlan, languageSettings).lyrics,
+    genre: contentPlan.digitalHuman.persona?.musicStyle ?? "pop",
+    mood: localizedText(languageSettings, "confident", "自信", "มั่นใจ"),
+    stylePrompt: localizedText(
+      languageSettings,
+      `${provider} prompt: clean short-form ${contentPlan.digitalHuman.persona?.musicStyle ?? "pop"}, strong hook, original melody.`,
+      `${provider} 提示词：干净短视频 ${contentPlan.digitalHuman.persona?.musicStyle ?? "pop"}，强钩子，原创旋律。`,
+      `${provider} prompt: เพลงสั้นสไตล์ ${contentPlan.digitalHuman.persona?.musicStyle ?? "pop"} ฮุกชัด เมโลดี้ต้นฉบับ`
+    ),
+    hook: localizedText(
+      languageSettings,
+      `A memorable hook about ${contentPlan.songIdea.theme}.`,
+      `关于 ${contentPlan.songIdea.theme} 的高记忆点副歌。`,
+      `ฮุกจำง่ายเกี่ยวกับ ${contentPlan.songIdea.theme}`
+    ),
+    duration: contentPlan.targetPlatform === "youtube" ? "90 seconds" : "45 seconds",
+    songPrompt: localizedText(
+      languageSettings,
+      `Create an original song for ${contentPlan.digitalHuman.displayName}: ${contentPlan.songIdea.musicPrompt}`,
+      `为 ${contentPlan.digitalHuman.displayName} 创作一首原创歌曲：${contentPlan.songIdea.musicPrompt}`,
+      `สร้างเพลงต้นฉบับให้ ${contentPlan.digitalHuman.displayName}: ${contentPlan.songIdea.musicPrompt}`
+    ),
+    hashtags: contentPlan.hashtags
+  };
+}
+
+function mockVideoBrief(
+  contentPlan: ContentPlanContext,
+  videoProvider: string,
+  languageSettings: LanguageSettings = defaultLanguageSettings
+): VideoBriefOutput {
+  return {
+    videoBrief: localizedText(
+      languageSettings,
+      `${videoProvider} digital-human performance for ${contentPlan.title}.`,
+      `${videoProvider} 数字人表演方案：${contentPlan.title}。`,
+      `บรีฟวิดีโอดิจิทัลฮิวแมนสำหรับ ${contentPlan.title} บน ${videoProvider}`
+    ),
     videoTitle: contentPlan.title,
-    avatarInstructions: `${contentPlan.digitalHuman.displayName} performs directly to camera with ${contentPlan.digitalHuman.persona?.visualStyle ?? "clean studio"} styling.`,
-    cameraStyle: "Vertical 9:16, close-up hook, gentle push-in.",
-    lipSyncNotes: "Match mouth movement to the chorus and keep expressions natural.",
+    avatarInstructions: localizedText(
+      languageSettings,
+      `${contentPlan.digitalHuman.displayName} performs directly to camera with ${contentPlan.digitalHuman.persona?.visualStyle ?? "clean studio"} styling.`,
+      `${contentPlan.digitalHuman.displayName} 以 ${contentPlan.digitalHuman.persona?.visualStyle ?? "干净棚拍"} 风格直视镜头演唱。`,
+      `${contentPlan.digitalHuman.displayName} แสดงหน้ากล้องในสไตล์ ${contentPlan.digitalHuman.persona?.visualStyle ?? "สตูดิโอสะอาดตา"}`
+    ),
+    cameraStyle: localizedText(languageSettings, "Vertical 9:16, close-up hook, gentle push-in.", "竖屏 9:16，副歌近景，轻微推进。", "แนวตั้ง 9:16 โคลสอัปช่วงฮุก กล้องค่อยๆ ดันเข้า"),
+    lipSyncNotes: localizedText(languageSettings, "Match mouth movement to the chorus and keep expressions natural.", "口型对齐副歌，表情保持自然。", "ลิปซิงก์ให้ตรงท่อนฮุกและรักษาสีหน้าให้เป็นธรรมชาติ"),
     scenePrompt: contentPlan.songIdea.videoScript,
     subtitleText: `${contentPlan.title}\n${contentPlan.songIdea.lyricsDirection}`,
     coverTitle: contentPlan.title
   };
 }
 
-function mockPublishCopy(contentPlan: ContentPlanContext, platform: TargetPlatform): PublishCopyOutput {
+function mockPublishCopy(
+  contentPlan: ContentPlanContext,
+  platform: TargetPlatform,
+  languageSettings: LanguageSettings = defaultLanguageSettings
+): PublishCopyOutput {
   const hashtags = contentPlan.hashtags;
+  const description = localizedText(
+    languageSettings,
+    `${contentPlan.caption}\n\n${hashtags.join(" ")}`,
+    `${contentPlan.caption}\n\n${hashtags.join(" ")}`,
+    `${contentPlan.caption}\n\n${hashtags.join(" ")}`
+  );
   return {
     title: contentPlan.title,
-    description: `${contentPlan.caption}\n\n${hashtags.join(" ")}`,
-    tiktokCaption: `${contentPlan.caption} ${hashtags.join(" ")}`,
+    description,
+    tiktokCaption: localizedText(
+      languageSettings,
+      `${contentPlan.caption} ${hashtags.join(" ")}`,
+      `${contentPlan.title}。适合短视频循环的原创 AI 音乐。${hashtags.join(" ")}`,
+      `${contentPlan.title} เพลง AI ต้นฉบับสำหรับคลิปสั้น ${hashtags.join(" ")}`
+    ),
     youtubeShortsTitle: contentPlan.title,
-    youtubeShortsDescription: `${contentPlan.caption}\n\n${hashtags.join(" ")}`,
+    youtubeShortsDescription: description,
     hashtags: platform === "youtube" ? [...hashtags, "#OriginalMusic"] : hashtags
   };
 }
 
-function mockNextContent(): NextContentOutput {
+function mockNextContent(languageSettings: LanguageSettings = defaultLanguageSettings): NextContentOutput {
   return {
     recommendations: [
-      { theme: "late night reset", rationale: "Strong emotional hook for repeat listening.", targetPlatform: "tiktok" },
-      { theme: "future self", rationale: "Works as aspirational short-form storytelling.", targetPlatform: "youtube_shorts" },
-      { theme: "quiet confidence", rationale: "Fits digital-human performance branding.", targetPlatform: "youtube" }
+      {
+        theme: localizedText(languageSettings, "late night reset", "深夜重启", "รีเซ็ตตอนดึก"),
+        rationale: localizedText(languageSettings, "Strong emotional hook for repeat listening.", "情绪钩子强，适合重复播放。", "ฮุกทางอารมณ์ชัด เหมาะกับการฟังซ้ำ"),
+        targetPlatform: "tiktok"
+      },
+      {
+        theme: localizedText(languageSettings, "future self", "未来的自己", "ตัวเองในอนาคต"),
+        rationale: localizedText(languageSettings, "Works as aspirational short-form storytelling.", "适合做有愿景感的短视频叙事。", "เหมาะกับสตอรี่สั้นเชิงแรงบันดาลใจ"),
+        targetPlatform: "youtube_shorts"
+      },
+      {
+        theme: localizedText(languageSettings, "quiet confidence", "安静的自信", "ความมั่นใจแบบเงียบๆ"),
+        rationale: localizedText(languageSettings, "Fits digital-human performance branding.", "契合数字人表演品牌。", "เข้ากับแบรนด์การแสดงของดิจิทัลฮิวแมน"),
+        targetPlatform: "youtube"
+      }
     ]
   };
+}
+
+function localizedList(settings: LanguageSettings, rows: [string, string, string][]) {
+  return rows.map(([english, chinese, thai]) => localizedText(settings, english, chinese, thai));
 }
 
 function estimateCostUsd(usage?: SmartAIUsage) {

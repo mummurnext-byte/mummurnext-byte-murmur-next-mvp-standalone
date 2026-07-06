@@ -1,6 +1,8 @@
 import type { SmartAIGeneration, SmartAIPurpose } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
+import { resolveLanguageSettings } from "./global-language";
+import { getUICopy } from "@/lib/ui-copy";
 import { getSmartLLMProvider, type LLMProvider, type SmartAIProviderRequest } from "./smart-ai-provider";
 import { SmartAISingerService, type SmartAISingerRepository } from "./smart-ai-singer";
 import type { SmartAIOutput } from "./smart-ai-schemas";
@@ -79,6 +81,107 @@ describe("smart ai singer", () => {
     ]);
   });
 
+  it("keeps UI language independent from content output language", () => {
+    const ui = getUICopy("zh-CN");
+    const contentLanguage = resolveLanguageSettings({ inputLanguage: "en", outputLanguage: "th", targetMarket: "thailand" });
+
+    expect(ui.createDigitalHuman).toBe("新建数字人");
+    expect(contentLanguage.outputLanguage).toBe("th");
+    expect(contentLanguage.targetMarket).toBe("thailand");
+  });
+
+  it("supports Chinese input to English output", async () => {
+    const output = await new SmartAISingerService(new MemorySmartAIRepository()).generateLyrics("plan-1", {
+      inputLanguage: "zh-CN",
+      outputLanguage: "en"
+    });
+
+    expect(output.lyrics).toContain("This is the hook");
+  });
+
+  it("supports Chinese input to Thai output", async () => {
+    const output = await new SmartAISingerService(new MemorySmartAIRepository()).generateLyrics("plan-1", {
+      inputLanguage: "zh-CN",
+      outputLanguage: "th",
+      targetMarket: "thailand"
+    });
+
+    expect(output.lyrics).toContain("ฮุก");
+  });
+
+  it("supports English input to Chinese output", async () => {
+    const output = await new SmartAISingerService(new MemorySmartAIRepository()).generatePublishCopy("plan-1", "tiktok", {
+      inputLanguage: "en",
+      outputLanguage: "zh-CN"
+    });
+
+    expect(output.tiktokCaption).toContain("适合短视频");
+  });
+
+  it("supports Thai input to Chinese output", async () => {
+    const output = await new SmartAISingerService(new MemorySmartAIRepository()).generateLyrics("plan-1", {
+      inputLanguage: "th",
+      outputLanguage: "zh-CN"
+    });
+
+    expect(output.lyrics).toContain("副歌");
+  });
+
+  it("supports Thai input to English output", async () => {
+    const output = await new SmartAISingerService(new MemorySmartAIRepository()).generateLyrics("plan-1", {
+      inputLanguage: "th",
+      outputLanguage: "en"
+    });
+
+    expect(output.lyrics).toContain("This is the hook");
+  });
+
+  it("adds Thailand localization instructions to prompts", async () => {
+    const provider = new TrackingProvider();
+    await new SmartAISingerService(new MemorySmartAIRepository(), provider).generateLyrics("plan-1", {
+      outputLanguage: "th",
+      targetMarket: "thailand"
+    });
+
+    expect(provider.userPrompts[0]).toContain("Use Thailand localization");
+    expect(provider.userPrompts[0]).toContain("Generate the final result entirely in Thai");
+  });
+
+  it("adds United States localization instructions to prompts", async () => {
+    const provider = new TrackingProvider();
+    await new SmartAISingerService(new MemorySmartAIRepository(), provider).generateLyrics("plan-1", {
+      outputLanguage: "en",
+      targetMarket: "us"
+    });
+
+    expect(provider.userPrompts[0]).toContain("Use United States localization");
+  });
+
+  it("gives output language priority over input language", async () => {
+    const output = await new SmartAISingerService(new MemorySmartAIRepository()).generateLyrics("plan-1", {
+      inputLanguage: "th",
+      outputLanguage: "zh-CN"
+    });
+
+    expect(output.lyrics).toContain("副歌");
+    expect(output.lyrics).not.toContain("This is the hook");
+  });
+
+  it("passes language settings to the configured provider", async () => {
+    const provider = new TrackingProvider();
+    await new SmartAISingerService(new MemorySmartAIRepository(), provider).generateMusicPrompt("plan-1", "suno_manual", {
+      inputLanguage: "auto",
+      outputLanguage: "th",
+      targetMarket: "thailand"
+    });
+
+    expect(provider.languageSettings[0]).toMatchObject({
+      inputLanguage: "auto",
+      outputLanguage: "th",
+      targetMarket: "thailand"
+    });
+  });
+
   it("records failed generations when structured output is invalid", async () => {
     const repo = new MemorySmartAIRepository();
     const service = new SmartAISingerService(repo, new InvalidOutputProvider());
@@ -124,9 +227,13 @@ class TrackingProvider implements LLMProvider {
   readonly provider = "tracking";
   readonly model = "tracking-model";
   readonly schemaNames: string[] = [];
+  readonly userPrompts: string[] = [];
+  readonly languageSettings: unknown[] = [];
 
   async generate<T extends SmartAIOutput>(request: SmartAIProviderRequest<T>) {
     this.schemaNames.push(request.schema.name);
+    this.userPrompts.push(request.userPrompt);
+    this.languageSettings.push(request.languageSettings);
 
     return {
       output: request.schema.validate(request.fallbackOutput),
@@ -161,11 +268,12 @@ class MemorySmartAIRepository implements SmartAISingerRepository {
     return this.generationsSinceStartOfDay;
   }
 
-  async startGeneration(input: { purpose: SmartAIPurpose }) {
+  async startGeneration(input: { purpose: SmartAIPurpose; languageSettings?: unknown }) {
     const generation = {
       id: `generation-${this.generations.length + 1}`,
       purpose: input.purpose,
-      status: "started" as const
+      status: "started" as const,
+      languageSettings: input.languageSettings
     };
     this.generations.push(generation);
     return { id: generation.id };
@@ -227,6 +335,9 @@ function digitalHumanFixture() {
       audience: "short video music fans",
       musicStyle: "electronic pop",
       visualStyle: "clean studio performance",
+      inputLanguage: "auto",
+      outputLanguage: "en",
+      targetMarket: "global",
       createdAt: new Date("2026-07-06T00:00:00.000Z"),
       updatedAt: new Date("2026-07-06T00:00:00.000Z"),
       deletedAt: null
@@ -244,6 +355,9 @@ function contentPlanFixture() {
     caption: "Original AI music concept.",
     hashtags: ["#MummurNext", "#AIMusic"],
     targetPlatform: "tiktok" as const,
+    inputLanguage: "auto",
+    outputLanguage: "en",
+    targetMarket: "global",
     status: "idea" as const,
     createdAt: new Date("2026-07-06T00:00:00.000Z"),
     updatedAt: new Date("2026-07-06T00:00:00.000Z"),
@@ -256,6 +370,9 @@ function contentPlanFixture() {
       lyricsDirection: "Write a compact hook.",
       videoScript: "Open with a close-up.",
       musicPrompt: "Electronic pop song about quiet confidence.",
+      inputLanguage: "auto",
+      outputLanguage: "en",
+      targetMarket: "global",
       createdAt: new Date("2026-07-06T00:00:00.000Z"),
       updatedAt: new Date("2026-07-06T00:00:00.000Z"),
       deletedAt: null

@@ -96,6 +96,9 @@ model SmartAIGeneration {
   model            String?
   digitalHumanId   String?        @map("digital_human_id") @db.Uuid
   contentPlanId    String?        @map("content_plan_id") @db.Uuid
+  inputLanguage    String         @default("auto") @map("input_language")
+  outputLanguage   String         @default("en") @map("output_language")
+  targetMarket     String         @default("global") @map("target_market")
   inputSummary     String         @map("input_summary")
   output           Json?
   errorMessage     String?        @map("error_message")
@@ -128,6 +131,9 @@ model Persona {
   audience       String
   musicStyle     String       @map("music_style")
   visualStyle    String       @map("visual_style")
+  inputLanguage  String       @default("auto") @map("input_language")
+  outputLanguage String       @default("en") @map("output_language")
+  targetMarket   String       @default("global") @map("target_market")
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
@@ -160,6 +166,9 @@ model SongIdea {
   lyricsDirection String        @map("lyrics_direction")
   videoScript     String        @map("video_script")
   musicPrompt     String        @map("music_prompt")
+  inputLanguage   String        @default("auto") @map("input_language")
+  outputLanguage  String        @default("en") @map("output_language")
+  targetMarket    String        @default("global") @map("target_market")
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz(6)
@@ -179,6 +188,9 @@ model ContentPlan {
   caption        String
   hashtags       String[]
   targetPlatform TargetPlatform  @map("target_platform")
+  inputLanguage  String          @default("auto") @map("input_language")
+  outputLanguage String          @default("en") @map("output_language")
+  targetMarket   String          @default("global") @map("target_market")
   status         ContentStatus   @default(idea)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)

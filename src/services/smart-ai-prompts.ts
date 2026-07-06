@@ -1,5 +1,10 @@
 import type { SmartAIPurpose } from "@prisma/client";
 
+import {
+  languageInstruction,
+  type LanguageSettings
+} from "@/services/global-language";
+
 export const smartAISystemPrompt = [
   "You are Smart AI Singer, the creative brain for Mummur Next MVP.",
   "Generate original AI music and digital-human content concepts.",
@@ -10,6 +15,7 @@ export const smartAISystemPrompt = [
 
 export function buildSmartAIPrompt(input: {
   purpose: SmartAIPurpose;
+  languageSettings: LanguageSettings;
   digitalHuman: {
     displayName: string;
     persona?: {
@@ -40,6 +46,7 @@ export function buildSmartAIPrompt(input: {
   const persona = input.digitalHuman.persona;
   const lines = [
     `Purpose: ${input.purpose}.`,
+    languageInstruction(input.languageSettings),
     `Digital human: ${input.digitalHuman.displayName}.`,
     persona ? `Persona archetype: ${persona.archetype}.` : "Persona archetype: missing.",
     persona ? `Backstory: ${persona.backstory}.` : null,
