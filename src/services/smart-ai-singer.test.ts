@@ -19,6 +19,31 @@ describe("smart ai singer", () => {
     expect(repo.generations[0].status).toBe("completed");
   });
 
+  it("allows generation before the daily limit is reached", async () => {
+    const repo = new MemorySmartAIRepository({ generationsSinceStartOfDay: 1 });
+
+    await withSmartAILimit("2", async () => {
+      await expect(new SmartAISingerService(repo).generateLyrics("plan-1")).resolves.toMatchObject({
+        songTitle: "Mummur Test - Quiet Confidence"
+      });
+    });
+
+    expect(repo.generations).toHaveLength(1);
+    expect(repo.generations[0].status).toBe("completed");
+  });
+
+  it("rejects generation when the daily limit is reached", async () => {
+    const repo = new MemorySmartAIRepository({ generationsSinceStartOfDay: 2 });
+
+    await withSmartAILimit("2", async () => {
+      await expect(new SmartAISingerService(repo).generateLyrics("plan-1")).rejects.toThrow(
+        "Smart AI daily limit reached (2)."
+      );
+    });
+
+    expect(repo.generations).toHaveLength(0);
+  });
+
   it("generates lyrics, music prompt, video brief, publish copy, and next content", async () => {
     const service = new SmartAISingerService(new MemorySmartAIRepository());
 
@@ -75,6 +100,11 @@ class FailingProvider implements LLMProvider {
 class MemorySmartAIRepository implements SmartAISingerRepository {
   generations: (Partial<SmartAIGeneration> & { id: string; status: "started" | "completed" | "failed" })[] = [];
   profile: { positioning: string } | null = null;
+  private readonly generationsSinceStartOfDay: number;
+
+  constructor(options: { generationsSinceStartOfDay?: number } = {}) {
+    this.generationsSinceStartOfDay = options.generationsSinceStartOfDay ?? 0;
+  }
 
   async getDigitalHuman() {
     return digitalHumanFixture();
@@ -89,7 +119,7 @@ class MemorySmartAIRepository implements SmartAISingerRepository {
   }
 
   async countGenerationsSince() {
-    return 0;
+    return this.generationsSinceStartOfDay;
   }
 
   async startGeneration(input: { purpose: SmartAIPurpose }) {
@@ -120,6 +150,21 @@ class MemorySmartAIRepository implements SmartAISingerRepository {
 
   async upsertSingerProfile(_digitalHumanId: string, output: { positioning: string }) {
     this.profile = { positioning: output.positioning };
+  }
+}
+
+async function withSmartAILimit(limit: string, callback: () => Promise<void>) {
+  const previousLimit = process.env.SMART_AI_DAILY_LIMIT;
+  process.env.SMART_AI_DAILY_LIMIT = limit;
+
+  try {
+    await callback();
+  } finally {
+    if (previousLimit === undefined) {
+      delete process.env.SMART_AI_DAILY_LIMIT;
+    } else {
+      process.env.SMART_AI_DAILY_LIMIT = previousLimit;
+    }
   }
 }
 
