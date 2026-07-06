@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ContentStatus {
+  idea
+  lyrics
+  music_generated
+  video_ready
+  published
+}
+
+enum TargetPlatform {
+  tiktok
+  youtube_shorts
+  youtube
+}
+
+enum AssetType {
+  audio
+  video
+  thumbnail
+  caption_package
+}
+
+enum PublishStatus {
+  draft
+  scheduled
+  published
+  failed
+}
+
+model DigitalHuman {
+  id             String          @id @default(uuid()) @db.Uuid
+  displayName    String          @map("display_name")
+  legalName      String?         @map("legal_name")
+  avatarUrl      String?         @map("avatar_url")
+  voiceSampleUrl String?         @map("voice_sample_url")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz(6)
+  persona        Persona?
+  consentRecords ConsentRecord[]
+  songIdeas      SongIdea[]
+  contentPlans   ContentPlan[]
+
+  @@map("digital_humans")
+}
+
+model Persona {
+  id             String       @id @default(uuid()) @db.Uuid
+  digitalHumanId String       @unique @map("digital_human_id") @db.Uuid
+  archetype      String
+  backstory      String
+  toneOfVoice    String       @map("tone_of_voice")
+  audience       String
+  musicStyle     String       @map("music_style")
+  visualStyle    String       @map("visual_style")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman   DigitalHuman @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+
+  @@map("personas")
+}
+
+model ConsentRecord {
+  id             String       @id @default(uuid()) @db.Uuid
+  digitalHumanId String       @map("digital_human_id") @db.Uuid
+  consentedName  String       @map("consented_name")
+  documentUrl    String       @map("document_url")
+  scope          String
+  signedAt       DateTime     @map("signed_at") @db.Timestamptz(6)
+  expiresAt      DateTime?    @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman   DigitalHuman @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+
+  @@index([digitalHumanId])
+  @@map("consent_records")
+}
+
+model SongIdea {
+  id              String        @id @default(uuid()) @db.Uuid
+  digitalHumanId  String        @map("digital_human_id") @db.Uuid
+  theme           String
+  lyricsDirection String        @map("lyrics_direction")
+  videoScript     String        @map("video_script")
+  musicPrompt     String        @map("music_prompt")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman    DigitalHuman  @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+  contentPlans    ContentPlan[]
+
+  @@index([digitalHumanId])
+  @@map("song_ideas")
+}
+
+model ContentPlan {
+  id             String          @id @default(uuid()) @db.Uuid
+  digitalHumanId String          @map("digital_human_id") @db.Uuid
+  songIdeaId     String          @map("song_idea_id") @db.Uuid
+  scheduledDate  DateTime        @map("scheduled_date") @db.Date
+  title          String
+  caption        String
+  hashtags       String[]
+  targetPlatform TargetPlatform  @map("target_platform")
+  status         ContentStatus   @default(idea)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman   DigitalHuman    @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+  songIdea       SongIdea        @relation(fields: [songIdeaId], references: [id], onDelete: Restrict)
+  publishAssets  PublishAsset[]
+  platformPosts  PlatformPost[]
+
+  @@index([digitalHumanId])
+  @@index([songIdeaId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("content_plans")
+}
+
+model FileAsset {
+  id             String   @id @default(uuid()) @db.Uuid
+  originalName   String   @map("original_name")
+  storageKey     String   @unique @map("storage_key")
+  mimeType       String   @map("mime_type")
+  byteSize       Int      @map("byte_size")
+  checksumSha256 String   @map("checksum_sha256")
+  entityType     String?  @map("entity_type")
+  entityId       String?  @map("entity_id")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@map("file_assets")
+}
+
+model PublishAsset {
+  id            String      @id @default(uuid()) @db.Uuid
+  contentPlanId String      @map("content_plan_id") @db.Uuid
+  assetType     AssetType   @map("asset_type")
+  assetUrl      String      @map("asset_url")
+  provider      String?
+  metadata      Json?
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  contentPlan   ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+
+  @@index([contentPlanId])
+  @@index([assetType])
+  @@map("publish_assets")
+}
+
+model PlatformPost {
+  id             String        @id @default(uuid()) @db.Uuid
+  contentPlanId  String        @map("content_plan_id") @db.Uuid
+  platform       TargetPlatform
+  status         PublishStatus @default(draft)
+  platformPostId String?       @map("platform_post_id")
+  postUrl        String?       @map("post_url")
+  publishedAt    DateTime?     @map("published_at") @db.Timestamptz(6)
+  errorMessage   String?       @map("error_message")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  contentPlan    ContentPlan   @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+
+  @@index([contentPlanId])
+  @@index([platform])
+  @@index([status])
+  @@map("platform_posts")
+}
