@@ -98,7 +98,7 @@ production PostgreSQL database is available.
    - `APP_BASE_URL`
    - `NODE_ENV`
    - `MAX_UPLOAD_BYTES`
-3. Run production migrations before serving traffic:
+3. Run production migrations before serving traffic if you are deploying manually:
 
 ```bash
 npx prisma migrate deploy
@@ -106,9 +106,10 @@ npx prisma migrate deploy
 
 4. Deploy from GitHub or with Vercel CLI.
 
-The app runs `prisma generate` during `postinstall`, and `npm run build` also
-runs `prisma generate && next build` so Prisma Client is available in Vercel
-builds.
+Vercel uses `vercel.json` to run `npx prisma migrate deploy && npm run build`,
+so production deployments apply committed Prisma migrations before building.
+The app also runs `prisma generate` during `postinstall`, and `npm run build`
+runs `prisma generate && next build` so Prisma Client is available in builds.
 
 ### File Uploads on Vercel
 
