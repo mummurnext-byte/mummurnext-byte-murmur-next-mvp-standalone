@@ -15,3 +15,4 @@
 - Added configurable LLM providers for weekly plan generation with Mock fallback and OpenAI support.
 - Added mock Music API Provider workflow with generation jobs, generated audio URLs, and retry support.
 - Added mock Video API Provider workflow with generation jobs, generated video URLs, and retry support.
+- Added Vercel deployment preparation notes and production Prisma migration script.

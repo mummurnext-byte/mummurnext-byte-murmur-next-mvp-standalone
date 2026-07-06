@@ -78,8 +78,70 @@ npm run test
 npm run build
 npm run db:generate
 npm run db:migrate
+npm run db:deploy
 npm run db:studio
 ```
+
+## Vercel Deployment
+
+This app can run on Vercel as a Next.js app, but uploaded local files are not production-safe on Vercel without object storage.
+
+### Vercel project settings
+
+- Framework preset: Next.js
+- Install command: `npm install`
+- Build command: `npm run build`
+- Output directory: leave default
+- Node.js version: 22+
+
+`npm run build` runs `prisma generate` before `next build`, so Prisma Client is generated during Vercel builds.
+
+### Required environment variables
+
+Set these in Vercel Project Settings for Preview and Production:
+
+```env
+DATABASE_URL="postgresql://..."
+LOCAL_FILE_STORAGE_DIR="/tmp/uploads"
+MAX_UPLOAD_BYTES="104857600"
+OPENAI_API_KEY=""
+```
+
+Notes:
+
+- `DATABASE_URL` must point to a production PostgreSQL database such as Neon, Supabase, or another managed Postgres provider.
+- `OPENAI_API_KEY` is optional. Leave it empty to use Mock weekly planning.
+- Do not commit real `.env`, `.env.local`, API keys, database credentials, cookies, or provider tokens.
+
+### Database migration
+
+Before promoting a production deployment, run migrations against the production database:
+
+```bash
+npm run db:deploy
+```
+
+Recommended order:
+
+1. Set Vercel environment variables.
+2. Run `npm run db:deploy` against the production `DATABASE_URL`.
+3. Deploy or promote the Vercel build.
+4. Open the app and create a test Digital Human.
+
+### File upload limitation on Vercel
+
+The current MVP stores manually uploaded audio/video files on local disk through `LOCAL_FILE_STORAGE_DIR`.
+
+On Vercel, local disk is ephemeral. `/tmp/uploads` can be used only for alpha smoke testing. Files may disappear after redeploys, cold starts, or instance changes.
+
+For real production use, replace local file storage with object storage before relying on uploads:
+
+- Vercel Blob
+- S3-compatible storage
+- Supabase Storage
+- Cloudflare R2
+
+The database already stores file metadata separately through `FileAsset` and `PublishAsset`, so the storage implementation can be swapped behind `src/lib/file-storage.ts`.
 
 ## Manual Music Workflow
 
