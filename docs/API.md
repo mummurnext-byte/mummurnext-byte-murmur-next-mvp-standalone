@@ -12,6 +12,8 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `updateContentPlanStatusAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
+- `savePlatformPostAction`
+- `markPlatformPostPublishedAction`
 
 ## Media Route
 
@@ -43,3 +45,4 @@ Video:
 - No real provider APIs are called.
 - No cookies, session tokens, provider credentials, or API keys are stored.
 - Browser automation is intentionally not used.
+- TikTok and YouTube publishing is manual only in this MVP.

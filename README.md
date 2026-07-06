@@ -11,6 +11,7 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
+- Prepare manual publishing records for TikTok, YouTube Shorts, and YouTube.
 
 No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
 
@@ -110,6 +111,21 @@ This workflow does not use unofficial APIs, browser automation, cookies, tokens,
 6. Upload the video file back to Mummur Next MVP.
 
 This workflow does not call video provider APIs, automate login, or store cookies/tokens.
+
+## Manual Publish Workflow
+
+1. Upload a video asset to a Content Plan.
+2. Open the Content Plan.
+3. Choose a platform:
+   - TikTok
+   - YouTube Shorts
+   - YouTube
+4. Enter publish title, description, hashtags, optional scheduled time, and optional failure note.
+5. Save the platform post as `draft`, `ready`, `scheduled`, or `failed`.
+6. After manually publishing on the platform, paste the published URL and mark the post as `published`.
+7. Review publish history entries on the Content Plan.
+
+This workflow does not call TikTok or YouTube APIs, automate posting, or store platform accounts.
 
 ## Future Integrations
 

@@ -1,6 +1,6 @@
 "use server";
 
-import type { ContentStatus } from "@prisma/client";
+import type { ContentStatus, PublishStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -14,6 +14,12 @@ import {
 } from "@/services/asset-services";
 import type { MusicProviderKey } from "@/services/music-provider";
 import { musicProviders } from "@/services/music-provider";
+import {
+  isPublishPlatform,
+  isPublishStatus,
+  scheduledAtFromInput,
+  splitPublishHashtags
+} from "@/services/publish-workflow";
 import { generateWeeklyPlan } from "@/services/weekly-plan";
 import type { VideoProviderKey } from "@/services/video-provider";
 import { videoProviders } from "@/services/video-provider";
@@ -195,6 +201,103 @@ export async function uploadVideoAssetAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function savePlatformPostAction(formData: FormData) {
+  const contentPlanId = requiredString(formData, "contentPlanId");
+  const platform = requiredString(formData, "platform");
+  const status = requiredString(formData, "status");
+
+  if (!isPublishPlatform(platform)) throw new Error("Publish platform is not supported.");
+  if (!isPublishStatus(status)) throw new Error("Publish status is not supported.");
+  if (status === "published") throw new Error("Use manual publish marking for published posts.");
+
+  const contentPlan = await requireActiveContentPlan(contentPlanId);
+  await requireLatestVideoAsset(contentPlanId);
+
+  const publishTitle = requiredString(formData, "publishTitle");
+  const publishDescription = requiredString(formData, "publishDescription");
+  const hashtags = splitPublishHashtags(requiredString(formData, "hashtags"));
+  const scheduledAt = scheduledAtFromInput(status, optionalString(formData, "scheduledAt"));
+  const errorMessage = status === "failed" ? optionalString(formData, "errorMessage") : null;
+
+  await prisma.$transaction(async (tx) => {
+    const platformPost = await tx.platformPost.upsert({
+      where: {
+        contentPlanId_platform: {
+          contentPlanId,
+          platform
+        }
+      },
+      create: {
+        contentPlanId,
+        platform,
+        status,
+        publishTitle,
+        publishDescription,
+        hashtags,
+        scheduledAt,
+        errorMessage
+      },
+      update: {
+        status,
+        publishTitle,
+        publishDescription,
+        hashtags,
+        scheduledAt,
+        errorMessage
+      }
+    });
+
+    await tx.platformPostHistory.create({
+      data: {
+        platformPostId: platformPost.id,
+        status,
+        note: publishHistoryNote(status, contentPlan.status)
+      }
+    });
+  });
+
+  revalidatePath("/");
+}
+
+export async function markPlatformPostPublishedAction(formData: FormData) {
+  const id = requiredString(formData, "id");
+  const publishedUrl = requiredString(formData, "publishedUrl");
+
+  const platformPost = await prisma.platformPost.findFirst({
+    where: { id, deletedAt: null, contentPlan: { deletedAt: null, digitalHuman: { deletedAt: null } } },
+    select: { id: true, contentPlanId: true }
+  });
+
+  if (!platformPost) throw new Error("Platform post was not found or is archived.");
+  await requireLatestVideoAsset(platformPost.contentPlanId);
+
+  await prisma.$transaction([
+    prisma.platformPost.update({
+      where: { id },
+      data: {
+        status: "published",
+        publishedUrl,
+        postUrl: publishedUrl,
+        publishedAt: new Date(),
+        errorMessage: null
+      }
+    }),
+    prisma.platformPostHistory.create({
+      data: {
+        platformPostId: id,
+        status: "published",
+        note: "Manually marked as published."
+      }
+    }),
+    prisma.contentPlan.update({
+      where: { id: platformPost.contentPlanId },
+      data: { status: "published" }
+    })
+  ]);
+
+  revalidatePath("/");
+}
+
 async function requireActiveDigitalHuman(id: string) {
   const digitalHuman = await prisma.digitalHuman.findFirst({
     where: { id, deletedAt: null },
@@ -223,6 +326,17 @@ async function requireLatestMusicAsset(contentPlanId: string) {
 
   if (!musicAsset) throw new Error("A music asset is required before video upload.");
   return musicAsset;
+}
+
+async function requireLatestVideoAsset(contentPlanId: string) {
+  const videoAsset = await prisma.publishAsset.findFirst({
+    where: { contentPlanId, assetType: "video", deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true }
+  });
+
+  if (!videoAsset) throw new Error("A video asset is required before publish preparation.");
+  return videoAsset;
 }
 
 function personaData(formData: FormData) {
@@ -298,4 +412,11 @@ function splitHashtags(value: string) {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
+}
+
+function publishHistoryNote(status: PublishStatus, contentStatus: ContentStatus) {
+  if (status === "ready") return "Ready for manual publishing.";
+  if (status === "scheduled") return "Manual publish time scheduled.";
+  if (status === "failed") return "Manual publish marked as failed.";
+  return `Publish workflow saved while content status is ${contentStatus}.`;
 }
