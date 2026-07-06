@@ -15,10 +15,12 @@ export function getEnv(source: EnvSource = process.env) {
     appBaseUrl: source.APP_BASE_URL ?? "http://localhost:3000",
     databaseUrl: source.DATABASE_URL ?? "",
     openaiApiKey: source.OPENAI_API_KEY ?? "",
+    openaiModel: source.OPENAI_MODEL ?? "gpt-5.5",
     blobReadWriteToken: source.BLOB_READ_WRITE_TOKEN ?? "",
     storageProvider: parseStorageProvider(source.STORAGE_PROVIDER),
     localFileStorageDir: source.LOCAL_FILE_STORAGE_DIR ?? "./uploads",
     maxUploadBytes: Number.isFinite(maxUploadBytes) && maxUploadBytes > 0 ? maxUploadBytes : 104857600,
+    smartAIDailyLimit: parsePositiveInt(source.SMART_AI_DAILY_LIMIT, 20),
     nodeEnv: source.NODE_ENV ?? "development",
     vercelGitCommitSha: source.VERCEL_GIT_COMMIT_SHA ?? "",
     npmPackageVersion: source.npm_package_version ?? ""
@@ -65,6 +67,11 @@ export function validateDeploymentEnv(source: EnvSource = process.env): Deployme
 export function parseStorageProvider(value?: string): StorageProviderKey {
   if (value === "s3" || value === "r2" || value === "vercel_blob") return value;
   return "local";
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function storageProviderDetail(env: ReturnType<typeof getEnv>) {

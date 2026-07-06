@@ -16,8 +16,10 @@ describe("env", () => {
 
     expect(env.appBaseUrl).toBe("http://localhost:3000");
     expect(env.openaiApiKey).toBe("");
+    expect(env.openaiModel).toBe("gpt-5.5");
     expect(env.storageProvider).toBe("local");
     expect(env.maxUploadBytes).toBe(104857600);
+    expect(env.smartAIDailyLimit).toBe(20);
   });
 
   it("validates deployment environment settings", () => {

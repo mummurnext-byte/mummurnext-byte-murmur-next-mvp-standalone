@@ -12,6 +12,8 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `updateContentPlanStatusAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
+- `generateSmartSingerProfileAction`
+- `askSmartSingerAction`
 
 ## Media Route
 
@@ -61,3 +63,5 @@ Video:
 - No real provider APIs are called.
 - No cookies, session tokens, provider credentials, or API keys are stored.
 - Browser automation is intentionally not used.
+- Smart AI Singer sends only text context to OpenAI; uploaded audio/video files are not sent.
+- OpenAI API keys are read from environment variables and are not logged.

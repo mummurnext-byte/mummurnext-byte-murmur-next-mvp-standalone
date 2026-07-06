@@ -13,3 +13,4 @@
 - Added tests for provider selection, prompt generation, upload validation, and metadata.
 - Added Vercel deployment readiness docs, environment example, storage provider abstraction, and admin deployment checklist page.
 - Added Vercel Blob storage provider for durable production media uploads.
+- Added Smart AI Singer service with OpenAI SDK support, mock fallback, structured output validation, usage logging, and back-office controls.

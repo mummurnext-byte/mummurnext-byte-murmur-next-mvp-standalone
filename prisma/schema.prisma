@@ -35,6 +35,22 @@ enum PublishStatus {
   failed
 }
 
+enum SmartAIPurpose {
+  singer_concept
+  song_idea
+  lyrics
+  music_prompt
+  video_brief
+  publish_copy
+  next_content
+}
+
+enum SmartAIStatus {
+  started
+  completed
+  failed
+}
+
 model DigitalHuman {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String          @map("display_name")
@@ -49,8 +65,58 @@ model DigitalHuman {
   consentRecords ConsentRecord[]
   songIdeas      SongIdea[]
   contentPlans   ContentPlan[]
+  smartSingerProfile SmartSingerProfile?
+  smartAIGenerations SmartAIGeneration[]
 
   @@map("digital_humans")
+}
+
+model SmartSingerProfile {
+  id               String       @id @default(uuid()) @db.Uuid
+  digitalHumanId   String       @unique @map("digital_human_id") @db.Uuid
+  positioning      String
+  personaSummary   String       @map("persona_summary")
+  musicStyle       String       @map("music_style")
+  audience         String
+  contentDirection String       @map("content_direction")
+  provider         String
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman     DigitalHuman @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+
+  @@map("smart_singer_profiles")
+}
+
+model SmartAIGeneration {
+  id               String         @id @default(uuid()) @db.Uuid
+  purpose          SmartAIPurpose
+  status           SmartAIStatus  @default(started)
+  provider         String
+  model            String?
+  digitalHumanId   String?        @map("digital_human_id") @db.Uuid
+  contentPlanId    String?        @map("content_plan_id") @db.Uuid
+  inputSummary     String         @map("input_summary")
+  output           Json?
+  errorMessage     String?        @map("error_message")
+  promptTokens     Int?           @map("prompt_tokens")
+  completionTokens Int?           @map("completion_tokens")
+  totalTokens      Int?           @map("total_tokens")
+  estimatedCostUsd Decimal?       @map("estimated_cost_usd") @db.Decimal(10, 6)
+  startedAt        DateTime       @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt       DateTime?      @map("finished_at") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman     DigitalHuman?  @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+  contentPlan      ContentPlan?   @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+
+  @@index([digitalHumanId])
+  @@index([contentPlanId])
+  @@index([purpose])
+  @@index([status])
+  @@index([createdAt])
+  @@map("smart_ai_generations")
 }
 
 model Persona {
@@ -121,6 +187,7 @@ model ContentPlan {
   songIdea       SongIdea        @relation(fields: [songIdeaId], references: [id], onDelete: Restrict)
   publishAssets  PublishAsset[]
   platformPosts  PlatformPost[]
+  smartAIGenerations SmartAIGeneration[]
 
   @@index([digitalHumanId])
   @@index([songIdeaId])
