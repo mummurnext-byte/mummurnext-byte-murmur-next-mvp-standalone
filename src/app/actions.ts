@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { storeUploadedFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
+import { isLLMProviderKey } from "@/services/llm-provider";
 import {
   assertMusicFile,
   assertVideoFile,
@@ -95,7 +96,10 @@ export async function addConsentRecordAction(formData: FormData) {
 }
 
 export async function generateWeeklyPlanAction(formData: FormData) {
-  await generateWeeklyPlan(requiredString(formData, "digitalHumanId"));
+  const provider = optionalString(formData, "llmProvider") ?? "mock";
+  if (!isLLMProviderKey(provider)) throw new Error("LLM provider is not supported.");
+
+  await generateWeeklyPlan(requiredString(formData, "digitalHumanId"), provider);
   revalidatePath("/");
 }
 

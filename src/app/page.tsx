@@ -15,6 +15,7 @@ import {
 } from "@/app/actions";
 import { CopyFields } from "@/components/copy-fields";
 import { prisma } from "@/lib/prisma";
+import { llmProviderOptions } from "@/services/llm-provider";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { defaultPublishCopy, publishPlatforms, publishStatuses } from "@/services/publish-workflow";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
@@ -62,8 +63,8 @@ export default async function Home({
         <header>
           <h1 className="text-3xl font-semibold">Mummur Next MVP</h1>
           <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-            Standalone AI digital-human music content system. No Back Office modules, no real AI
-            provider API calls, no cookies or tokens.
+            Standalone AI digital-human music content system. No Back Office modules, no media
+            provider automation, no cookies or tokens.
           </p>
         </header>
 
@@ -245,7 +246,16 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
 
           <form action={generateWeeklyPlanAction} className="rounded-md border border-zinc-800 p-3">
             <input type="hidden" name="digitalHumanId" value={human.id} />
-            <Submit>Generate 7-day Plan</Submit>
+            <Select label="LLM provider" name="llmProvider" defaultValue="mock">
+              {llmProviderOptions.map((provider) => (
+                <option key={provider.providerKey} value={provider.providerKey}>
+                  {provider.providerName}
+                </option>
+              ))}
+            </Select>
+            <div className="mt-3">
+              <Submit>Generate 7-day Plan</Submit>
+            </div>
           </form>
 
           <div className="rounded-md border border-zinc-800 p-3">

@@ -12,3 +12,4 @@
 - Added music and video upload with local file metadata and playback.
 - Added manual TikTok, YouTube Shorts, and YouTube publish workflow with status history.
 - Added tests for provider selection, prompt generation, upload validation, and metadata.
+- Added configurable LLM providers for weekly plan generation with Mock fallback and OpenAI support.

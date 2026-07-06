@@ -5,7 +5,7 @@ Standalone AI digital-human music content system.
 This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
-- Generate mock 7-day Content Plans.
+- Generate 7-day Content Plans with Mock or OpenAI LLM providers.
 - Prepare manual Suno / MakeBestMusic music prompts.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
 - Prepare manual HeyGen / Akool / D-ID video prompts after music exists.
@@ -13,7 +13,7 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Play uploaded audio and video inside the local app.
 - Prepare manual publishing records for TikTok, YouTube Shorts, and YouTube.
 
-No real AI, music, video, TikTok, or YouTube APIs are called in this MVP.
+Music, video, TikTok, and YouTube APIs are not called in this MVP. Weekly planning can use OpenAI only when `OPENAI_API_KEY` is configured; otherwise it automatically uses the Mock provider.
 
 ## Requirements
 
@@ -34,6 +34,14 @@ npm install
 ```bash
 copy .env.example .env
 ```
+
+Optional OpenAI configuration:
+
+```env
+OPENAI_API_KEY=""
+```
+
+Leave `OPENAI_API_KEY` empty for local Mock generation. When it is set, choose `OpenAI` in the weekly plan form to generate copy through OpenAI. The app does not log the API key.
 
 3. Start PostgreSQL and create a database matching `DATABASE_URL`.
 
@@ -74,7 +82,7 @@ npm run db:studio
 ## Manual Music Workflow
 
 1. Create a Digital Human with Persona and Consent.
-2. Generate a 7-day Content Plan.
+2. Generate a 7-day Content Plan with Mock or OpenAI.
 3. Open a Content Plan.
 4. Choose Suno or MakeBestMusic.
 5. Copy:
@@ -131,6 +139,7 @@ This workflow does not call TikTok or YouTube APIs, automate posting, or store p
 
 Provider abstractions live under `src/services`:
 
+- `LLMProvider`
 - `MusicProvider`
 - `VideoProvider`
 

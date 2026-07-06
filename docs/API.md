@@ -15,6 +15,13 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `savePlatformPostAction`
 - `markPlatformPostPublishedAction`
 
+`generateWeeklyPlanAction` accepts an optional `llmProvider` form value:
+
+- `mock`
+- `openai`
+
+If `openai` is selected without `OPENAI_API_KEY`, generation falls back to `mock`.
+
 ## Media Route
 
 ### `GET /api/assets/{id}`
@@ -42,7 +49,9 @@ Video:
 
 ## Security Boundaries
 
-- No real provider APIs are called.
-- No cookies, session tokens, provider credentials, or API keys are stored.
+- Weekly plan generation can call OpenAI only when `OPENAI_API_KEY` is configured.
+- The OpenAI API key is read from environment variables and is not stored in the database or written to logs.
+- Music, video, TikTok, and YouTube provider APIs are not called.
+- No cookies, session tokens, or provider credentials are stored.
 - Browser automation is intentionally not used.
 - TikTok and YouTube publishing is manual only in this MVP.

@@ -1,22 +1,12 @@
-import type { DigitalHuman, Persona, TargetPlatform } from "@prisma/client";
+import type { DigitalHuman, Persona } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getLLMProvider } from "@/services/llm-provider";
+import type { LLMProviderKey } from "@/services/llm-provider";
 
 type HumanWithPersona = DigitalHuman & { persona: Persona | null };
 
-const themes = [
-  "quiet confidence",
-  "late night reset",
-  "founder glow up",
-  "summer revenge",
-  "soft launch romance",
-  "city lights",
-  "future self"
-];
-
-const platforms: TargetPlatform[] = ["tiktok", "youtube_shorts", "youtube"];
-
-export async function generateWeeklyPlan(digitalHumanId: string) {
+export async function generateWeeklyPlan(digitalHumanId: string, providerKey?: LLMProviderKey) {
   const digitalHuman = await prisma.digitalHuman.findFirst({
     where: { id: digitalHumanId, deletedAt: null },
     include: { persona: true }
@@ -54,7 +44,7 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
     throw new Error("This digital human already has a plan in the current 7-day window.");
   }
 
-  const items = mockGenerateWeeklyPlan(digitalHuman);
+  const items = await getLLMProvider(providerKey).generateWeeklyPlan({ digitalHuman });
 
   await prisma.$transaction(
     items.map((item, index) =>
@@ -87,22 +77,7 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
 }
 
 export function mockGenerateWeeklyPlan(digitalHuman: HumanWithPersona) {
-  return themes.map((theme, index) => {
-    const platform = platforms[index % platforms.length];
-    const title = `${digitalHuman.displayName} - ${titleCase(theme)}`;
-    const tag = digitalHuman.displayName.replace(/\s+/g, "");
-
-    return {
-      theme,
-      lyricsDirection: `Write a concise hook about ${theme} for ${digitalHuman.persona?.audience}.`,
-      videoScript: `Open with ${digitalHuman.displayName} facing camera, cut to a hook moment, close with a reusable short-form loop.`,
-      musicPrompt: `${digitalHuman.persona?.musicStyle ?? "modern pop"} song about ${theme}.`,
-      title,
-      caption: `${title}. Original AI music concept for short-form video.`,
-      hashtags: ["#MummurNext", `#${tag}`, "#AIMusic"],
-      targetPlatform: platform
-    };
-  });
+  return getLLMProvider("mock").generateWeeklyPlan({ digitalHuman });
 }
 
 function startOfDay(date: Date) {
@@ -115,8 +90,4 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
-}
-
-function titleCase(value: string) {
-  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
