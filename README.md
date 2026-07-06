@@ -64,7 +64,9 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | Variable | Required | Example | Notes |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/mummur_next_mvp?schema=public` | PostgreSQL connection string used by Prisma. |
-| `OPENAI_API_KEY` | No | empty | Optional. Leave empty to use mock generation. |
+| `OPENAI_API_KEY` | No | empty | Optional. Leave empty to use mock Smart AI Singer generation. |
+| `OPENAI_MODEL` | No | `gpt-5.5` | OpenAI model used by Smart AI Singer when `OPENAI_API_KEY` is configured. |
+| `SMART_AI_DAILY_LIMIT` | No | `20` | Maximum Smart AI Singer generations per day. |
 | `APP_BASE_URL` | Yes | `http://localhost:3000` | Public base URL for the app. |
 | `STORAGE_PROVIDER` | Yes | `local` | Use `local` for development or `vercel_blob` for Vercel media uploads. |
 | `BLOB_READ_WRITE_TOKEN` | Required for `vercel_blob` | empty | Vercel Blob read/write token. Configure in Vercel, never commit a real value. |
@@ -82,6 +84,8 @@ production PostgreSQL database is available.
 2. Add environment variables in Vercel:
    - `DATABASE_URL`
    - `OPENAI_API_KEY` (optional; leave empty to use mock generation)
+   - `OPENAI_MODEL`
+   - `SMART_AI_DAILY_LIMIT`
    - `STORAGE_PROVIDER` (`vercel_blob` for production uploads)
    - `BLOB_READ_WRITE_TOKEN` (required when `STORAGE_PROVIDER=vercel_blob`)
    - `APP_BASE_URL`
@@ -162,6 +166,36 @@ npm run db:studio
 8. Upload the audio file back to Mummur Next MVP.
 
 This workflow does not use unofficial APIs, browser automation, cookies, tokens, or saved provider accounts.
+
+## Smart AI Singer Workflow
+
+Smart AI Singer is the digital singer brain for Mummur Next MVP. It uses the
+Digital Human persona, content plan context, selected provider, target platform,
+and recent content history to generate structured creative outputs.
+
+It can generate:
+
+- Smart Singer Profile
+- song idea
+- lyrics
+- Suno / MakeBestMusic music prompt
+- HeyGen / Akool / D-ID video brief
+- TikTok / YouTube publishing copy
+- next content suggestions
+
+Configure `OPENAI_API_KEY` in Vercel or `.env` to use OpenAI. If
+`OPENAI_API_KEY` is empty, Smart AI Singer automatically uses
+`MockLLMProvider`, so local development works without paid API calls.
+
+All model outputs are validated against local schemas before being saved. Failed
+generations are recorded with an error status instead of crashing the page.
+
+Cost control:
+
+- `SMART_AI_DAILY_LIMIT` limits daily generations.
+- Each generation records purpose, provider, model, status, token usage when the
+  SDK returns it, and estimated cost.
+- Uploaded audio/video files are not sent to OpenAI.
 
 ## Manual Video Workflow
 

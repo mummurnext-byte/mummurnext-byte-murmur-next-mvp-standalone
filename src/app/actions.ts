@@ -17,6 +17,7 @@ import { musicProviders } from "@/services/music-provider";
 import { generateWeeklyPlan } from "@/services/weekly-plan";
 import type { VideoProviderKey } from "@/services/video-provider";
 import { videoProviders } from "@/services/video-provider";
+import { SmartAISingerService } from "@/services/smart-ai-singer";
 
 export async function createDigitalHumanAction(formData: FormData) {
   const digitalHuman = await prisma.digitalHuman.create({
@@ -195,6 +196,49 @@ export async function uploadVideoAssetAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function generateSmartSingerProfileAction(formData: FormData) {
+  const digitalHumanId = requiredString(formData, "digitalHumanId");
+  await runSmartAIAction(() => new SmartAISingerService().generateSingerConcept(digitalHumanId));
+  revalidatePath("/");
+}
+
+export async function askSmartSingerAction(formData: FormData) {
+  const contentPlanId = requiredString(formData, "contentPlanId");
+  const task = requiredString(formData, "task");
+  const service = new SmartAISingerService();
+
+  await runSmartAIAction(async () => {
+    if (task === "lyrics") {
+      await service.generateLyrics(contentPlanId);
+      return;
+    }
+    if (task === "suno_prompt") {
+      await service.generateMusicPrompt(contentPlanId, "suno_manual");
+      return;
+    }
+    if (task === "makebestmusic_prompt") {
+      await service.generateMusicPrompt(contentPlanId, "makebestmusic_manual");
+      return;
+    }
+    if (task === "video_brief") {
+      await service.generateVideoBrief(contentPlanId, requiredString(formData, "videoProvider"));
+      return;
+    }
+    if (task === "tiktok_copy") {
+      await service.generatePublishCopy(contentPlanId, "tiktok");
+      return;
+    }
+    if (task === "youtube_copy") {
+      await service.generatePublishCopy(contentPlanId, "youtube_shorts");
+      return;
+    }
+
+    throw new Error("Smart Singer task is not supported.");
+  });
+
+  revalidatePath("/");
+}
+
 async function requireActiveDigitalHuman(id: string) {
   const digitalHuman = await prisma.digitalHuman.findFirst({
     where: { id, deletedAt: null },
@@ -298,4 +342,12 @@ function splitHashtags(value: string) {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
+}
+
+async function runSmartAIAction(action: () => Promise<unknown>) {
+  try {
+    await action();
+  } catch {
+    // SmartAISingerService records failed generations; keep the page stable.
+  }
 }

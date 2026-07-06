@@ -3,7 +3,9 @@ import Link from "next/link";
 
 import {
   addConsentRecordAction,
+  askSmartSingerAction,
   createDigitalHumanAction,
+  generateSmartSingerProfileAction,
   generateWeeklyPlanAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
@@ -132,7 +134,13 @@ async function loadSelectedHuman(id: string) {
     where: { id, deletedAt: null },
     include: {
       persona: true,
-      consentRecords: { where: { deletedAt: null }, orderBy: { signedAt: "desc" } }
+      consentRecords: { where: { deletedAt: null }, orderBy: { signedAt: "desc" } },
+      smartSingerProfile: true,
+      smartAIGenerations: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 5
+      }
     }
   });
 }
@@ -148,6 +156,11 @@ async function loadSelectedPlan(id: string) {
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         take: 20
+      },
+      smartAIGenerations: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 10
       }
     }
   });
@@ -198,6 +211,11 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
             <Submit>Generate 7-day Plan</Submit>
           </form>
 
+          <form action={generateSmartSingerProfileAction} className="rounded-md border border-zinc-800 p-3">
+            <input type="hidden" name="digitalHumanId" value={human.id} />
+            <Submit>Generate Smart Singer Profile</Submit>
+          </form>
+
           <div className="rounded-md border border-zinc-800 p-3">
             <div className="text-sm font-medium">Consent Records</div>
             {human.consentRecords.length === 0 ? (
@@ -212,6 +230,8 @@ function SelectedHumanPanel({ human }: { human: NonNullable<Awaited<ReturnType<t
               </ul>
             )}
           </div>
+
+          <SmartSingerProfilePanel human={human} />
         </div>
       </div>
     </Panel>
@@ -241,6 +261,8 @@ function SelectedPlanPanel({
     <Panel title={`Content Plan: ${contentPlan.title}`}>
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4">
+          <AskSmartSingerPanel contentPlan={contentPlan} selectedVideoProvider={videoProvider.providerKey} />
+
           <ProviderSelect
             planId={contentPlan.id}
             label="Music provider"
@@ -356,6 +378,152 @@ function SelectedPlanPanel({
         </aside>
       </div>
     </Panel>
+  );
+}
+
+function SmartSingerProfilePanel({
+  human
+}: {
+  human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>>;
+}) {
+  const profile = human.smartSingerProfile;
+
+  return (
+    <div className="rounded-md border border-zinc-800 p-3">
+      <div className="text-sm font-medium">Smart Singer Profile</div>
+      {profile ? (
+        <div className="mt-3 space-y-3 text-sm text-zinc-300">
+          <SmartField label="Positioning" value={profile.positioning} />
+          <SmartField label="Persona" value={profile.personaSummary} />
+          <SmartField label="Music Style" value={profile.musicStyle} />
+          <SmartField label="Audience" value={profile.audience} />
+          <SmartField label="Content Direction" value={profile.contentDirection} />
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-zinc-400">No Smart Singer Profile yet.</p>
+      )}
+      <SmartGenerationList generations={human.smartAIGenerations} />
+    </div>
+  );
+}
+
+function AskSmartSingerPanel({
+  contentPlan,
+  selectedVideoProvider
+}: {
+  contentPlan: NonNullable<SelectedPlan>;
+  selectedVideoProvider: string;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+      <div className="text-sm font-medium">Ask Smart Singer</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <SmartTaskButton contentPlanId={contentPlan.id} task="lyrics">
+          Generate Lyrics
+        </SmartTaskButton>
+        <SmartTaskButton contentPlanId={contentPlan.id} task="suno_prompt">
+          Generate Suno Prompt
+        </SmartTaskButton>
+        <SmartTaskButton contentPlanId={contentPlan.id} task="makebestmusic_prompt">
+          Generate MakeBestMusic Prompt
+        </SmartTaskButton>
+        <SmartTaskButton contentPlanId={contentPlan.id} task="video_brief" videoProvider={selectedVideoProvider}>
+          Generate Video Brief
+        </SmartTaskButton>
+        <SmartTaskButton contentPlanId={contentPlan.id} task="tiktok_copy">
+          Generate TikTok Copy
+        </SmartTaskButton>
+        <SmartTaskButton contentPlanId={contentPlan.id} task="youtube_copy">
+          Generate YouTube Copy
+        </SmartTaskButton>
+      </div>
+      <SmartGenerationList generations={contentPlan.smartAIGenerations} />
+    </div>
+  );
+}
+
+function SmartTaskButton({
+  contentPlanId,
+  task,
+  videoProvider,
+  children
+}: {
+  contentPlanId: string;
+  task: string;
+  videoProvider?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <form action={askSmartSingerAction}>
+      <input type="hidden" name="contentPlanId" value={contentPlanId} />
+      <input type="hidden" name="task" value={task} />
+      {videoProvider ? <input type="hidden" name="videoProvider" value={videoProvider} /> : null}
+      <button type="submit" className="rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:border-zinc-500">
+        {children}
+      </button>
+    </form>
+  );
+}
+
+function SmartGenerationList({
+  generations
+}: {
+  generations: {
+    id: string;
+    purpose: string;
+    status: string;
+    provider: string;
+    output: unknown;
+    errorMessage: string | null;
+    totalTokens: number | null;
+    estimatedCostUsd: unknown;
+    createdAt: Date;
+  }[];
+}) {
+  if (generations.length === 0) return null;
+
+  return (
+    <div className="mt-4 space-y-3">
+      {generations.map((generation) => (
+        <div key={generation.id} className="rounded border border-zinc-800 p-3 text-sm">
+          <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
+            <span>{generation.purpose}</span>
+            <span>{generation.status}</span>
+            <span>{generation.provider}</span>
+            <span>{formatDate(generation.createdAt)}</span>
+            {generation.totalTokens ? <span>{generation.totalTokens} tokens</span> : null}
+            {generation.estimatedCostUsd ? <span>${String(generation.estimatedCostUsd)}</span> : null}
+          </div>
+          {generation.status === "failed" ? (
+            <p className="mt-2 text-amber-300">{generation.errorMessage ?? "Smart AI generation failed."}</p>
+          ) : (
+            <SmartOutput output={generation.output} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SmartOutput({ output }: { output: unknown }) {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return null;
+  const entries = Object.entries(output as Record<string, unknown>);
+
+  return (
+    <div className="mt-3 grid gap-2">
+      {entries.map(([key, value]) => (
+        <SmartField key={key} label={labelFromKey(key)} value={formatSmartValue(value)} />
+      ))}
+    </div>
+  );
+}
+
+function SmartField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs uppercase text-zinc-500">{label}</div>
+      <div className="mt-1 whitespace-pre-wrap text-zinc-300">{value}</div>
+    </div>
   );
 }
 
@@ -529,6 +697,20 @@ function formatDate(date: Date) {
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
+}
+
+function labelFromKey(value: string) {
+  return value.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function formatSmartValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => formatSmartValue(item)).join("\n");
+  }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value ?? "");
 }
 
 function isUuid(value: string) {
