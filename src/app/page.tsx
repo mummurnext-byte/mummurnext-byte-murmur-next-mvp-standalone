@@ -519,6 +519,9 @@ function SmartGenerationList({
     purpose: string;
     status: string;
     provider: string;
+    inputLanguage: string;
+    outputLanguage: string;
+    targetMarket: string;
     output: unknown;
     errorMessage: string | null;
     totalTokens: number | null;
@@ -536,6 +539,9 @@ function SmartGenerationList({
             <span>{generation.purpose}</span>
             <span>{generation.status}</span>
             <span>{generation.provider}</span>
+            <span>input: {generation.inputLanguage}</span>
+            <span>output: {generation.outputLanguage}</span>
+            <span>market: {generation.targetMarket}</span>
             <span>{formatDate(generation.createdAt)}</span>
             {generation.totalTokens ? <span>{generation.totalTokens} tokens</span> : null}
             {generation.estimatedCostUsd ? <span>${String(generation.estimatedCostUsd)}</span> : null}
