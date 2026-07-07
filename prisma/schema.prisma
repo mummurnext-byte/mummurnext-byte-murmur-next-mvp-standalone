@@ -200,12 +200,35 @@ model ContentPlan {
   publishAssets  PublishAsset[]
   platformPosts  PlatformPost[]
   smartAIGenerations SmartAIGeneration[]
+  creativeEvidence CreativeEvidence?
 
   @@index([digitalHumanId])
   @@index([songIdeaId])
   @@index([scheduledDate])
   @@index([status])
   @@map("content_plans")
+}
+
+model CreativeEvidence {
+  id                 String      @id @default(uuid()) @db.Uuid
+  contentPlanId      String      @unique @map("content_plan_id") @db.Uuid
+  idea               String?
+  songOutline        String?     @map("song_outline")
+  story              String?
+  mood               String?
+  character          String?
+  prompt             String?
+  geminiRevisionLog  String?     @map("gemini_revision_log")
+  finalLyrics        String?     @map("final_lyrics")
+  sunoPrompt         String?     @map("suno_prompt")
+  publishAt          DateTime?   @map("publish_at") @db.Timestamptz(6)
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  contentPlan        ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Restrict)
+
+  @@index([publishAt])
+  @@map("creative_evidence")
 }
 
 model FileAsset {

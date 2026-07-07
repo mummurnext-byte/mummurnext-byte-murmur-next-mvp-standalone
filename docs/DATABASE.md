@@ -20,6 +20,7 @@ Vercel builds generate Prisma Client through `postinstall`. Do not run
 - `ConsentRecord`: real-person authorization record.
 - `SongIdea`: generated song concept with the language/market context used when it was created.
 - `ContentPlan`: scheduled content item, production status, and per-plan language/market overrides.
+- `CreativeEvidence`: one Content Plan creative audit trail from idea to final lyrics, Suno prompt, and publish time.
 - `FileAsset`: uploaded file metadata.
 - `PublishAsset`: uploaded audio/video metadata linked to a content plan.
 - `PlatformPost`: planned platform publishing record.
@@ -73,6 +74,27 @@ Tracked fields include:
 - error message
 - prompt / completion / total tokens
 - estimated cost
+
+## Creative Evidence Records
+
+`CreativeEvidence` is a one-to-one record linked by
+`creative_evidence.content_plan_id`.
+
+Tracked fields:
+
+- `idea`
+- `song_outline`
+- `story`
+- `mood`
+- `character`
+- `prompt`
+- `gemini_revision_log`
+- `final_lyrics`
+- `suno_prompt`
+- `publish_at`
+
+The record is manually edited from the Content Plan detail page and is intended
+for review, audit, and repeatability. It does not trigger external API calls.
 
 ## Global Language Fields
 

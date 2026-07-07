@@ -16,3 +16,4 @@
 - Added Smart AI Singer service with OpenAI SDK support, mock fallback, structured output validation, usage logging, and back-office controls.
 - Added multi-provider Smart AI Singer LLM selection for Mock, OpenAI, Gemini, Groq, and OpenRouter with mock fallback when keys are missing.
 - Added global language and target market controls for UI language, Smart AI output language, input language detection, localized prompts, and generation audit logs.
+- Added Creative Evidence records for Content Plans to track idea, outline, story, mood, character, prompts, Gemini revisions, final lyrics, Suno prompt, and publish time.

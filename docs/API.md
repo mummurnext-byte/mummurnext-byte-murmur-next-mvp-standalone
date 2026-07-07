@@ -11,6 +11,7 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `updateContentPlanCopyAction`
 - `updateContentPlanLanguageAction`
 - `updateContentPlanStatusAction`
+- `updateCreativeEvidenceAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
 - `generateSmartSingerProfileAction`
@@ -25,6 +26,11 @@ Language-aware actions accept:
 `inputLanguage` is only used for interpreting source material. Smart AI Singer
 must generate final text in `outputLanguage` and localize style, hashtags, and
 platform copy for `targetMarket`.
+
+`updateCreativeEvidenceAction` stores the Content Plan creative audit trail:
+Idea, Song Outline, Story, Mood, Character, Prompt, Gemini Revision Log, Final
+Lyrics, Suno Prompt, and Publish Time. It only edits local database state and
+does not call Gemini, Suno, TikTok, YouTube, or any external API.
 
 ## Media Route
 

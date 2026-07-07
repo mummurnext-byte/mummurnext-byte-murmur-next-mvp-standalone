@@ -13,6 +13,7 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Play uploaded audio and video inside the local app.
 - Optionally call a configured LLM provider for Smart AI Singer text generation.
 - Choose UI language, content output language, input language detection, and target market independently.
+- Track Creative Evidence for each Content Plan from idea through final lyrics, Suno prompt, and publish time.
 
 Music, video, TikTok, and YouTube providers remain manual in this MVP. Smart AI
 Singer falls back to mock generation when no LLM provider key is configured.
@@ -223,6 +224,37 @@ Cost control:
 - Uploaded audio/video files are not sent to any LLM provider.
 - API keys are read from environment variables and are never displayed in the
   deployment checklist or written to logs.
+
+## Creative Evidence
+
+Each Content Plan can store one Creative Evidence record. This is an audit trail
+for the creative chain:
+
+```text
+Idea
+↓
+Song Outline
+↓
+Story
+↓
+Mood
+↓
+Character
+↓
+Prompt
+↓
+Gemini Revision Log
+↓
+Final Lyrics
+↓
+Suno Prompt
+↓
+Publish Time
+```
+
+Creative Evidence is edited on the Content Plan detail page. It does not call an
+external API and does not send uploaded media to an LLM. The record is linked to
+the Content Plan with a one-to-one `creative_evidence.content_plan_id` relation.
 
 ## Global Language System
 

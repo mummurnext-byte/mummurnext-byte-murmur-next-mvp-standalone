@@ -132,6 +132,25 @@ export async function updateContentPlanLanguageAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function updateCreativeEvidenceAction(formData: FormData) {
+  const contentPlanId = requiredString(formData, "contentPlanId");
+  await requireActiveContentPlan(contentPlanId);
+
+  await prisma.creativeEvidence.upsert({
+    where: { contentPlanId },
+    create: {
+      contentPlanId,
+      ...creativeEvidenceData(formData)
+    },
+    update: {
+      ...creativeEvidenceData(formData),
+      deletedAt: null
+    }
+  });
+
+  revalidatePath("/");
+}
+
 export async function updateContentPlanStatusAction(formData: FormData) {
   const id = requiredString(formData, "id");
   const status = requiredString(formData, "status");
@@ -331,6 +350,21 @@ function consentData(formData: FormData) {
   };
 }
 
+function creativeEvidenceData(formData: FormData) {
+  return {
+    idea: optionalString(formData, "idea"),
+    songOutline: optionalString(formData, "songOutline"),
+    story: optionalString(formData, "story"),
+    mood: optionalString(formData, "mood"),
+    character: optionalString(formData, "character"),
+    prompt: optionalString(formData, "prompt"),
+    geminiRevisionLog: optionalString(formData, "geminiRevisionLog"),
+    finalLyrics: optionalString(formData, "finalLyrics"),
+    sunoPrompt: optionalString(formData, "sunoPrompt"),
+    publishAt: dateTimeFromForm(formData, "publishAt")
+  };
+}
+
 function isMusicProvider(value: string): value is MusicProviderKey {
   return musicProviders.some((provider) => provider.providerKey === value);
 }
@@ -369,6 +403,11 @@ function optionalString(formData: FormData, key: string) {
 function dateFromForm(formData: FormData, key: string) {
   const value = optionalString(formData, key);
   return value ? new Date(`${value}T00:00:00`) : null;
+}
+
+function dateTimeFromForm(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+  return value ? new Date(value) : null;
 }
 
 function splitHashtags(value: string) {

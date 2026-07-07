@@ -10,6 +10,7 @@ import {
   updateContentPlanLanguageAction,
   updateContentPlanCopyAction,
   updateContentPlanStatusAction,
+  updateCreativeEvidenceAction,
   updateDigitalHumanAction,
   uploadMusicAssetAction,
   uploadVideoAssetAction
@@ -165,6 +166,7 @@ async function loadSelectedPlan(id: string) {
     include: {
       digitalHuman: { include: { persona: true } },
       songIdea: true,
+      creativeEvidence: true,
       publishAssets: {
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
@@ -295,6 +297,7 @@ function SelectedPlanPanel({
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <AskSmartSingerPanel contentPlan={contentPlan} selectedVideoProvider={videoProvider.providerKey} ui={ui} />
+          <CreativeEvidencePanel contentPlan={contentPlan} />
 
           <ProviderSelect
             planId={contentPlan.id}
@@ -451,6 +454,33 @@ function SmartSingerProfilePanel({
         <p className="mt-2 text-sm text-zinc-400">No Smart Singer Profile yet.</p>
       )}
       <SmartGenerationList generations={human.smartAIGenerations} />
+    </div>
+  );
+}
+
+function CreativeEvidencePanel({ contentPlan }: { contentPlan: NonNullable<SelectedPlan> }) {
+  const evidence = contentPlan.creativeEvidence;
+
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+      <div className="text-sm font-medium">Creative Evidence</div>
+      <p className="mt-1 text-xs text-zinc-500">
+        Track the creative chain from idea to final lyrics, Suno prompt, and publishing time.
+      </p>
+      <form action={updateCreativeEvidenceAction} className="mt-3 grid gap-3">
+        <input type="hidden" name="contentPlanId" value={contentPlan.id} />
+        <Textarea label="Idea" name="idea" defaultValue={evidence?.idea ?? contentPlan.songIdea.theme} />
+        <Textarea label="Song Outline" name="songOutline" defaultValue={evidence?.songOutline ?? contentPlan.songIdea.lyricsDirection} />
+        <Textarea label="Story" name="story" defaultValue={evidence?.story ?? contentPlan.songIdea.videoScript} />
+        <Input label="Mood" name="mood" defaultValue={evidence?.mood ?? ""} />
+        <Textarea label="Character" name="character" defaultValue={evidence?.character ?? contentPlan.digitalHuman.persona?.archetype ?? ""} />
+        <Textarea label="Prompt" name="prompt" defaultValue={evidence?.prompt ?? contentPlan.songIdea.musicPrompt} />
+        <Textarea label="Gemini Revision Log" name="geminiRevisionLog" defaultValue={evidence?.geminiRevisionLog ?? ""} />
+        <Textarea label="Final Lyrics" name="finalLyrics" defaultValue={evidence?.finalLyrics ?? ""} />
+        <Textarea label="Suno Prompt" name="sunoPrompt" defaultValue={evidence?.sunoPrompt ?? ""} />
+        <Input label="Publish time" name="publishAt" type="datetime-local" defaultValue={formatDateTimeInput(evidence?.publishAt)} />
+        <Submit>Save Creative Evidence</Submit>
+      </form>
     </div>
   );
 }
@@ -789,6 +819,11 @@ function formatDate(date: Date) {
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
+}
+
+function formatDateTimeInput(date?: Date | null) {
+  if (!date) return "";
+  return date.toISOString().slice(0, 16);
 }
 
 function labelFromKey(value: string) {
