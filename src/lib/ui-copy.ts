@@ -1,0 +1,91 @@
+import type { UILanguage } from "@/lib/ui-language";
+
+const copy = {
+  en: {
+    description: "Standalone AI digital-human music content system. Smart AI Singer can use a configured LLM provider; music, video, and publishing providers remain manual.",
+    deploymentChecklist: "Deployment Checklist",
+    createDigitalHuman: "Create Digital Human",
+    digitalHumans: "Digital Humans",
+    noDigitalHumans: "No digital humans yet.",
+    contentPlans: "Content Plans",
+    noContentPlans: "No content plans yet.",
+    globalPreferences: "Global content preferences",
+    inputLanguage: "Input Language",
+    outputLanguage: "Content Output Language",
+    targetMarket: "Target Market",
+    saveDigitalHuman: "Save Digital Human",
+    generateWeeklyPlan: "Generate 7-day Plan",
+    generateProfile: "Generate Smart Singer Profile",
+    askSmartSinger: "Ask Smart Singer",
+    languageNote: "UI language, output language, and target market are independent.",
+    generateSongIdea: "Generate Song Idea",
+    generateLyrics: "Generate Lyrics",
+    generateSunoPrompt: "Generate Suno Prompt",
+    generateMakeBestMusicPrompt: "Generate MakeBestMusic Prompt",
+    generateVideoBrief: "Generate Video Brief",
+    generateTikTokCopy: "Generate TikTok Copy",
+    generateYouTubeCopy: "Generate YouTube Copy",
+    contentLanguageSettings: "Content language settings",
+    saveLanguageSettings: "Save Language Settings"
+  },
+  "zh-CN": {
+    description: "独立 AI 数字人音乐内容系统。Smart AI Singer 可使用已配置的大模型；音乐、视频和发布平台仍保持手动流程。",
+    deploymentChecklist: "部署检查清单",
+    createDigitalHuman: "新建数字人",
+    digitalHumans: "数字人列表",
+    noDigitalHumans: "还没有数字人。",
+    contentPlans: "内容计划",
+    noContentPlans: "还没有内容计划。",
+    globalPreferences: "全球化内容偏好",
+    inputLanguage: "输入语言",
+    outputLanguage: "内容输出语言",
+    targetMarket: "目标市场",
+    saveDigitalHuman: "保存数字人",
+    generateWeeklyPlan: "生成 7 天计划",
+    generateProfile: "生成智能歌手档案",
+    askSmartSinger: "询问 Smart Singer",
+    languageNote: "后台界面语言、内容输出语言和目标市场互相独立。",
+    generateSongIdea: "生成歌曲创意",
+    generateLyrics: "生成歌词",
+    generateSunoPrompt: "生成 Suno Prompt",
+    generateMakeBestMusicPrompt: "生成 MakeBestMusic Prompt",
+    generateVideoBrief: "生成视频方案",
+    generateTikTokCopy: "生成 TikTok 文案",
+    generateYouTubeCopy: "生成 YouTube 文案",
+    contentLanguageSettings: "内容语言设置",
+    saveLanguageSettings: "保存语言设置"
+  },
+  th: {
+    description: "ระบบหลังบ้าน AI digital human สำหรับเพลงและคอนเทนต์ Smart AI Singer ใช้ LLM ที่ตั้งค่าไว้ได้ ส่วนเพลง วิดีโอ และการเผยแพร่ยังเป็นขั้นตอนแบบ manual",
+    deploymentChecklist: "เช็กลิสต์การ deploy",
+    createDigitalHuman: "สร้าง Digital Human",
+    digitalHumans: "รายการ Digital Human",
+    noDigitalHumans: "ยังไม่มี Digital Human",
+    contentPlans: "แผนคอนเทนต์",
+    noContentPlans: "ยังไม่มีแผนคอนเทนต์",
+    globalPreferences: "ค่าภาษาและตลาดของคอนเทนต์",
+    inputLanguage: "ภาษาต้นทาง",
+    outputLanguage: "ภาษาผลลัพธ์",
+    targetMarket: "ตลาดเป้าหมาย",
+    saveDigitalHuman: "บันทึก Digital Human",
+    generateWeeklyPlan: "สร้างแผน 7 วัน",
+    generateProfile: "สร้างโปรไฟล์ Smart Singer",
+    askSmartSinger: "ถาม Smart Singer",
+    languageNote: "ภาษา UI, ภาษาผลลัพธ์ และตลาดเป้าหมายแยกกันอย่างอิสระ",
+    generateSongIdea: "สร้างไอเดียเพลง",
+    generateLyrics: "สร้างเนื้อเพลง",
+    generateSunoPrompt: "สร้าง Suno Prompt",
+    generateMakeBestMusicPrompt: "สร้าง MakeBestMusic Prompt",
+    generateVideoBrief: "สร้างบรีฟวิดีโอ",
+    generateTikTokCopy: "สร้างข้อความ TikTok",
+    generateYouTubeCopy: "สร้างข้อความ YouTube",
+    contentLanguageSettings: "ตั้งค่าภาษาเนื้อหา",
+    saveLanguageSettings: "บันทึกภาษา"
+  }
+} satisfies Record<UILanguage, Record<string, string>>;
+
+export type UICopy = (typeof copy)["en"];
+
+export function getUICopy(language: UILanguage): UICopy {
+  return copy[language];
+}

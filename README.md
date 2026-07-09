@@ -12,6 +12,8 @@ This repository is intentionally separate from Mummur Back Office. It contains o
 - Upload generated video assets: `mp4`, `mov`, `webm`.
 - Play uploaded audio and video inside the local app.
 - Optionally call a configured LLM provider for Smart AI Singer text generation.
+- Choose UI language, content output language, input language detection, and target market independently.
+- Track Creative Evidence for each Content Plan from idea through final lyrics, Suno prompt, and publish time.
 
 Music, video, TikTok, and YouTube providers remain manual in this MVP. Smart AI
 Singer falls back to mock generation when no LLM provider key is configured.
@@ -204,7 +206,7 @@ Recommended low-cost local configuration:
 
 ```env
 LLM_PROVIDER=gemini
-LLM_MODEL=gemini-1.5-flash
+LLM_MODEL=gemini-2.5-flash
 SMART_AI_DAILY_LIMIT=20
 ```
 
@@ -222,6 +224,57 @@ Cost control:
 - Uploaded audio/video files are not sent to any LLM provider.
 - API keys are read from environment variables and are never displayed in the
   deployment checklist or written to logs.
+
+## Creative Evidence
+
+Each Content Plan can store one Creative Evidence record. This is an audit trail
+for the creative chain:
+
+```text
+Idea
+↓
+Song Outline
+↓
+Story
+↓
+Mood
+↓
+Character
+↓
+Prompt
+↓
+Gemini Revision Log
+↓
+Final Lyrics
+↓
+Suno Prompt
+↓
+Publish Time
+```
+
+Creative Evidence is edited on the Content Plan detail page. It does not call an
+external API and does not send uploaded media to an LLM. The record is linked to
+the Content Plan with a one-to-one `creative_evidence.content_plan_id` relation.
+
+## Global Language System
+
+Mummur Next MVP separates three concepts:
+
+- UI Language: the back-office interface language. Supported values are English, 简体中文, and ไทย. The app chooses a default from the browser language, then stores the user's switcher choice in `localStorage` and the `mummur_ui_language` cookie.
+- Content Output Language: the language Smart AI Singer must use for generated lyrics, titles, prompts, video briefs, and publish copy. Supported values are English, 简体中文, and ไทย.
+- Target Market: localization strategy for audience taste, cultural tone, hooks, hashtags, and TikTok / YouTube copy. Supported values are Global, United States, China, Thailand, Japan, Korea, Spain, France, and Germany.
+
+Input Language is only used to understand source material. It does not decide the final output language. Supported values are Auto Detect, English, 简体中文, and ไทย.
+
+Examples:
+
+- Chinese input -> Thai lyrics: set Input Language to `简体中文`, Content Output Language to `ไทย`, Target Market to `Thailand`.
+- English input -> Chinese TikTok copy: set Input Language to `English`, Content Output Language to `简体中文`, Target Market to `China` or `Global`.
+- Thai input -> English YouTube copy: set Input Language to `ไทย`, Content Output Language to `English`, Target Market to `United States` or `Global`.
+
+Persona stores default language and market preferences. Content Plan can override those defaults. Each Smart AI Singer generation log stores the exact `inputLanguage`, `outputLanguage`, and `targetMarket` used for auditability.
+
+Prompt rules are centralized in `src/services/smart-ai-prompts.ts` and language / market definitions live in `src/services/global-language.ts`. To add a new language, add it to `inputLanguageOptions` and/or `outputLanguageOptions`, extend `localizedText` usage where mock output needs deterministic text, and add tests. To add a new market, add it to `targetMarketOptions`, define its `marketInstruction`, and add prompt tests.
 
 ## Manual Video Workflow
 

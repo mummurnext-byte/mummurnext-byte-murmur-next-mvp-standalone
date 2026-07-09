@@ -9,11 +9,28 @@ Mummur Next MVP uses Server Actions for back-office mutations and one media rout
 - `addConsentRecordAction`
 - `generateWeeklyPlanAction`
 - `updateContentPlanCopyAction`
+- `updateContentPlanLanguageAction`
 - `updateContentPlanStatusAction`
+- `updateCreativeEvidenceAction`
 - `uploadMusicAssetAction`
 - `uploadVideoAssetAction`
 - `generateSmartSingerProfileAction`
 - `askSmartSingerAction`
+
+Language-aware actions accept:
+
+- `inputLanguage`: `auto`, `en`, `zh-CN`, or `th`
+- `outputLanguage`: `en`, `zh-CN`, or `th`
+- `targetMarket`: `global`, `us`, `china`, `thailand`, `japan`, `korea`, `spain`, `france`, or `germany`
+
+`inputLanguage` is only used for interpreting source material. Smart AI Singer
+must generate final text in `outputLanguage` and localize style, hashtags, and
+platform copy for `targetMarket`.
+
+`updateCreativeEvidenceAction` stores the Content Plan creative audit trail:
+Idea, Song Outline, Story, Mood, Character, Prompt, Gemini Revision Log, Final
+Lyrics, Suno Prompt, and Publish Time. It only edits local database state and
+does not call Gemini, Suno, TikTok, YouTube, or any external API.
 
 ## Media Route
 
@@ -64,3 +81,4 @@ Video:
 - Browser automation is intentionally not used.
 - Smart AI Singer sends only text context to the selected LLM provider; uploaded audio/video files are not sent.
 - LLM API keys are read from environment variables and are not logged.
+- UI language, content output language, and target market are independent settings.

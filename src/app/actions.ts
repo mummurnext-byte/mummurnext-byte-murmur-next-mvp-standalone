@@ -7,6 +7,12 @@ import { redirect } from "next/navigation";
 import { storeUploadedFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
 import {
+  languageSettingsFromForm,
+  normalizeInputLanguage,
+  normalizeOutputLanguage,
+  normalizeTargetMarket
+} from "@/services/global-language";
+import {
   assertMusicFile,
   assertVideoFile,
   buildMusicAssetMetadata,
@@ -110,6 +116,41 @@ export async function updateContentPlanCopyAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function updateContentPlanLanguageAction(formData: FormData) {
+  const id = requiredString(formData, "id");
+  await requireActiveContentPlan(id);
+
+  await prisma.contentPlan.update({
+    where: { id },
+    data: {
+      inputLanguage: normalizeInputLanguage(formData.get("inputLanguage")?.toString()),
+      outputLanguage: normalizeOutputLanguage(formData.get("outputLanguage")?.toString()),
+      targetMarket: normalizeTargetMarket(formData.get("targetMarket")?.toString())
+    }
+  });
+
+  revalidatePath("/");
+}
+
+export async function updateCreativeEvidenceAction(formData: FormData) {
+  const contentPlanId = requiredString(formData, "contentPlanId");
+  await requireActiveContentPlan(contentPlanId);
+
+  await prisma.creativeEvidence.upsert({
+    where: { contentPlanId },
+    create: {
+      contentPlanId,
+      ...creativeEvidenceData(formData)
+    },
+    update: {
+      ...creativeEvidenceData(formData),
+      deletedAt: null
+    }
+  });
+
+  revalidatePath("/");
+}
+
 export async function updateContentPlanStatusAction(formData: FormData) {
   const id = requiredString(formData, "id");
   const status = requiredString(formData, "status");
@@ -198,7 +239,9 @@ export async function uploadVideoAssetAction(formData: FormData) {
 
 export async function generateSmartSingerProfileAction(formData: FormData) {
   const digitalHumanId = requiredString(formData, "digitalHumanId");
-  await runSmartAIAction(() => new SmartAISingerService().generateSingerConcept(digitalHumanId));
+  await runSmartAIAction(() =>
+    new SmartAISingerService().generateSingerConcept(digitalHumanId, languageSettingsFromForm(formData))
+  );
   revalidatePath("/");
 }
 
@@ -209,31 +252,35 @@ export async function askSmartSingerAction(formData: FormData) {
 
   await runSmartAIAction(async () => {
     if (task === "song_idea") {
-      await service.generateSongIdea(contentPlanId);
+      await service.generateSongIdea(contentPlanId, languageSettingsFromForm(formData));
       return;
     }
     if (task === "lyrics") {
-      await service.generateLyrics(contentPlanId);
+      await service.generateLyrics(contentPlanId, languageSettingsFromForm(formData));
       return;
     }
     if (task === "suno_prompt") {
-      await service.generateMusicPrompt(contentPlanId, "suno_manual");
+      await service.generateMusicPrompt(contentPlanId, "suno_manual", languageSettingsFromForm(formData));
       return;
     }
     if (task === "makebestmusic_prompt") {
-      await service.generateMusicPrompt(contentPlanId, "makebestmusic_manual");
+      await service.generateMusicPrompt(contentPlanId, "makebestmusic_manual", languageSettingsFromForm(formData));
       return;
     }
     if (task === "video_brief") {
-      await service.generateVideoBrief(contentPlanId, requiredString(formData, "videoProvider"));
+      await service.generateVideoBrief(
+        contentPlanId,
+        requiredString(formData, "videoProvider"),
+        languageSettingsFromForm(formData)
+      );
       return;
     }
     if (task === "tiktok_copy") {
-      await service.generatePublishCopy(contentPlanId, "tiktok");
+      await service.generatePublishCopy(contentPlanId, "tiktok", languageSettingsFromForm(formData));
       return;
     }
     if (task === "youtube_copy") {
-      await service.generatePublishCopy(contentPlanId, "youtube_shorts");
+      await service.generatePublishCopy(contentPlanId, "youtube_shorts", languageSettingsFromForm(formData));
       return;
     }
 
@@ -280,7 +327,10 @@ function personaData(formData: FormData) {
     toneOfVoice: requiredString(formData, "toneOfVoice"),
     audience: requiredString(formData, "audience"),
     musicStyle: requiredString(formData, "musicStyle"),
-    visualStyle: requiredString(formData, "visualStyle")
+    visualStyle: requiredString(formData, "visualStyle"),
+    inputLanguage: normalizeInputLanguage(formData.get("inputLanguage")?.toString()),
+    outputLanguage: normalizeOutputLanguage(formData.get("outputLanguage")?.toString()),
+    targetMarket: normalizeTargetMarket(formData.get("targetMarket")?.toString())
   };
 }
 
@@ -297,6 +347,21 @@ function consentData(formData: FormData) {
     scope,
     signedAt: dateFromForm(formData, "signedAt") ?? new Date(),
     expiresAt: dateFromForm(formData, "expiresAt")
+  };
+}
+
+function creativeEvidenceData(formData: FormData) {
+  return {
+    idea: optionalString(formData, "idea"),
+    songOutline: optionalString(formData, "songOutline"),
+    story: optionalString(formData, "story"),
+    mood: optionalString(formData, "mood"),
+    character: optionalString(formData, "character"),
+    prompt: optionalString(formData, "prompt"),
+    geminiRevisionLog: optionalString(formData, "geminiRevisionLog"),
+    finalLyrics: optionalString(formData, "finalLyrics"),
+    sunoPrompt: optionalString(formData, "sunoPrompt"),
+    publishAt: dateTimeFromForm(formData, "publishAt")
   };
 }
 
@@ -338,6 +403,11 @@ function optionalString(formData: FormData, key: string) {
 function dateFromForm(formData: FormData, key: string) {
   const value = optionalString(formData, key);
   return value ? new Date(`${value}T00:00:00`) : null;
+}
+
+function dateTimeFromForm(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+  return value ? new Date(value) : null;
 }
 
 function splitHashtags(value: string) {

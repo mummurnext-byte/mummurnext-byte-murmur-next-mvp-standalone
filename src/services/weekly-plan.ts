@@ -1,6 +1,7 @@
 import type { DigitalHuman, Persona, TargetPlatform } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { languageSettingsFromRecord, localizedText } from "@/services/global-language";
 
 type HumanWithPersona = DigitalHuman & { persona: Persona | null };
 
@@ -55,6 +56,7 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
   }
 
   const items = mockGenerateWeeklyPlan(digitalHuman);
+  const languageSettings = languageSettingsFromRecord(digitalHuman.persona);
 
   await prisma.$transaction(
     items.map((item, index) =>
@@ -65,6 +67,9 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
           lyricsDirection: item.lyricsDirection,
           videoScript: item.videoScript,
           musicPrompt: item.musicPrompt,
+          inputLanguage: languageSettings.inputLanguage,
+          outputLanguage: languageSettings.outputLanguage,
+          targetMarket: languageSettings.targetMarket,
           contentPlans: {
             create: {
               digitalHumanId,
@@ -73,6 +78,9 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
               caption: item.caption,
               hashtags: item.hashtags,
               targetPlatform: item.targetPlatform,
+              inputLanguage: languageSettings.inputLanguage,
+              outputLanguage: languageSettings.outputLanguage,
+              targetMarket: languageSettings.targetMarket,
               platformPosts: {
                 create: {
                   platform: item.targetPlatform
@@ -87,6 +95,7 @@ export async function generateWeeklyPlan(digitalHumanId: string) {
 }
 
 export function mockGenerateWeeklyPlan(digitalHuman: HumanWithPersona) {
+  const languageSettings = languageSettingsFromRecord(digitalHuman.persona);
   return themes.map((theme, index) => {
     const platform = platforms[index % platforms.length];
     const title = `${digitalHuman.displayName} - ${titleCase(theme)}`;
@@ -94,11 +103,31 @@ export function mockGenerateWeeklyPlan(digitalHuman: HumanWithPersona) {
 
     return {
       theme,
-      lyricsDirection: `Write a concise hook about ${theme} for ${digitalHuman.persona?.audience}.`,
-      videoScript: `Open with ${digitalHuman.displayName} facing camera, cut to a hook moment, close with a reusable short-form loop.`,
-      musicPrompt: `${digitalHuman.persona?.musicStyle ?? "modern pop"} song about ${theme}.`,
+      lyricsDirection: localizedText(
+        languageSettings,
+        `Write a concise hook about ${theme} for ${digitalHuman.persona?.audience}.`,
+        `为 ${digitalHuman.persona?.audience} 写一句关于 ${theme} 的简洁中文副歌钩子。`,
+        `เขียนฮุกภาษาไทยสั้นๆ เกี่ยวกับ ${theme} สำหรับ ${digitalHuman.persona?.audience}`
+      ),
+      videoScript: localizedText(
+        languageSettings,
+        `Open with ${digitalHuman.displayName} facing camera, cut to a hook moment, close with a reusable short-form loop.`,
+        `开场让 ${digitalHuman.displayName} 直视镜头，切到副歌高光，结尾形成可循环短视频。`,
+        `เปิดด้วย ${digitalHuman.displayName} มองกล้อง ตัดเข้าช่วงฮุก แล้วจบแบบวนลูปได้`
+      ),
+      musicPrompt: localizedText(
+        languageSettings,
+        `${digitalHuman.persona?.musicStyle ?? "modern pop"} song about ${theme}.`,
+        `关于 ${theme} 的 ${digitalHuman.persona?.musicStyle ?? "modern pop"} 歌曲。`,
+        `เพลง ${digitalHuman.persona?.musicStyle ?? "modern pop"} เกี่ยวกับ ${theme}`
+      ),
       title,
-      caption: `${title}. Original AI music concept for short-form video.`,
+      caption: localizedText(
+        languageSettings,
+        `${title}. Original AI music concept for short-form video.`,
+        `${title}。面向短视频的原创 AI 音乐概念。`,
+        `${title} คอนเซปต์เพลง AI ต้นฉบับสำหรับวิดีโอสั้น`
+      ),
       hashtags: ["#MummurNext", `#${tag}`, "#AIMusic"],
       targetPlatform: platform
     };
