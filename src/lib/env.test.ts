@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { getEnv, parseLLMProvider, parseStorageProvider, validateDeploymentEnv } from "./env";
+import {
+  getEnv,
+  parseDigitalHumanImageProvider,
+  parseLLMProvider,
+  parseStorageProvider,
+  validateDeploymentEnv
+} from "./env";
 
 describe("env", () => {
   it("selects supported storage providers", () => {
@@ -20,6 +26,27 @@ describe("env", () => {
     expect(parseLLMProvider("unknown")).toBe("mock");
   });
 
+  it("selects supported digital human image providers", () => {
+    expect(parseDigitalHumanImageProvider("openai")).toBe("openai");
+    expect(parseDigitalHumanImageProvider("gemini")).toBe("gemini");
+    expect(parseDigitalHumanImageProvider("mock")).toBe("mock");
+    expect(parseDigitalHumanImageProvider("unknown")).toBe("mock");
+  });
+
+  it("reuses configured Gemini for digital-human images only when the image provider is unset", () => {
+    const automatic = getEnv({ LLM_PROVIDER: "gemini", GEMINI_API_KEY: "test-only-key" });
+    const explicitMock = getEnv({
+      LLM_PROVIDER: "gemini",
+      GEMINI_API_KEY: "test-only-key",
+      DIGITAL_HUMAN_IMAGE_PROVIDER: "mock"
+    });
+
+    expect(automatic.digitalHumanImageProvider).toBe("gemini");
+    expect(automatic.digitalHumanImageModel).toBe("gemini-3.1-flash-image");
+    expect(explicitMock.digitalHumanImageProvider).toBe("mock");
+    expect(explicitMock.digitalHumanImageModel).toBe("gpt-image-2");
+  });
+
   it("uses safe defaults without secrets", () => {
     const env = getEnv({});
 
@@ -34,6 +61,9 @@ describe("env", () => {
     expect(env.storageProvider).toBe("local");
     expect(env.maxUploadBytes).toBe(104857600);
     expect(env.smartAIDailyLimit).toBe(20);
+    expect(env.digitalHumanImageProvider).toBe("mock");
+    expect(env.digitalHumanImageModel).toBe("gpt-image-2");
+    expect(env.digitalHumanImageDailyLimit).toBe(5);
   });
 
   it("validates deployment environment settings", () => {

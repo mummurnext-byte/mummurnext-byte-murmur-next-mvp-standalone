@@ -1,6 +1,6 @@
 # API and Actions
 
-Mummur Next MVP uses Server Actions for back-office mutations and one media route for playback.
+Mummur Next MVP uses Server Actions for back-office mutations and media routes for upload and playback.
 
 ## Server Actions
 
@@ -33,6 +33,27 @@ Lyrics, Suno Prompt, and Publish Time. It only edits local database state and
 does not call Gemini, Suno, TikTok, YouTube, or any external API.
 
 ## Media Route
+
+### `POST /api/digital-humans/{id}/generate-image`
+
+Creates a digital-human avatar from an authorized portrait. The request is `multipart/form-data` with:
+
+- `file`: JPG, PNG, or WebP, maximum 10 MB
+- `style`: `studio`, `music_artist`, `cinematic`, or `futuristic`
+- `consentConfirmed`: must be `on`
+
+The Digital Human must have an active, non-expired Consent Record. The service validates both file extension/MIME and image magic bytes, applies the UTC daily limit, records source metadata and a SHA-256 checksum without retaining the source bytes, and saves the completed output through the configured Storage Provider.
+
+`DIGITAL_HUMAN_IMAGE_PROVIDER` accepts `mock`, `gemini`, or `openai`. A missing matching API key falls back to Local Preview. If the image setting is omitted while `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the service reuses Gemini through its official image editing API.
+
+The Gemini interaction requests a `1:1`, 1K JPEG result because the current
+Interactions API image response format supports JPEG. Gemini image generation
+requires a billing-enabled API project; quota errors are returned as a safe,
+actionable provider error without logging the API key or source portrait.
+
+### `GET /api/digital-human-images/{fileAssetId}`
+
+Streams only completed digital-human output images. Source portrait bytes are not retained.
 
 ### `GET /api/assets/{id}`
 
@@ -74,11 +95,19 @@ Video:
 - Extensions: `mp4`, `mov`, `webm`
 - MIME types: `video/mp4`, `video/quicktime`, `video/webm`
 
+Digital-human source portraits:
+
+- Extensions: `jpg`, `jpeg`, `png`, `webp`
+- MIME types: `image/jpeg`, `image/png`, `image/webp`
+- Maximum size: 10 MB
+- File signatures are checked before storage and generation.
+
 ## Security Boundaries
 
 - Manual music/video providers do not call real provider APIs.
 - No cookies, session tokens, provider credentials, or API keys are stored.
 - Browser automation is intentionally not used.
 - Smart AI Singer sends only text context to the selected LLM provider; uploaded audio/video files are not sent.
+- Source portraits are sent only to the configured image Provider after active database consent and explicit per-request confirmation. They are never sent to Smart AI Singer or a text LLM.
 - LLM API keys are read from environment variables and are not logged.
 - UI language, content output language, and target market are independent settings.

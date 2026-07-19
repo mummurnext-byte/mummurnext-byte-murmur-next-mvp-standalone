@@ -1,5 +1,6 @@
 export type StorageProviderKey = "local" | "s3" | "r2" | "vercel_blob";
 export type LLMProviderKey = "mock" | "openai" | "gemini" | "groq" | "openrouter";
+export type DigitalHumanImageProviderKey = "mock" | "openai" | "gemini";
 
 export type DeploymentCheck = {
   label: string;
@@ -12,6 +13,11 @@ export type EnvSource = Partial<Record<string, string | undefined>>;
 export function getEnv(source: EnvSource = process.env) {
   const maxUploadBytes = Number(source.MAX_UPLOAD_BYTES ?? 104857600);
   const llmProvider = source.LLM_PROVIDER ? parseLLMProvider(source.LLM_PROVIDER) : source.OPENAI_API_KEY ? "openai" : "mock";
+  const digitalHumanImageProvider = source.DIGITAL_HUMAN_IMAGE_PROVIDER
+    ? parseDigitalHumanImageProvider(source.DIGITAL_HUMAN_IMAGE_PROVIDER)
+    : source.LLM_PROVIDER === "gemini" && source.GEMINI_API_KEY
+      ? "gemini"
+      : "mock";
 
   return {
     appBaseUrl: source.APP_BASE_URL ?? "http://localhost:3000",
@@ -28,6 +34,11 @@ export function getEnv(source: EnvSource = process.env) {
     localFileStorageDir: source.LOCAL_FILE_STORAGE_DIR ?? "./uploads",
     maxUploadBytes: Number.isFinite(maxUploadBytes) && maxUploadBytes > 0 ? maxUploadBytes : 104857600,
     smartAIDailyLimit: parsePositiveInt(source.SMART_AI_DAILY_LIMIT, 20),
+    digitalHumanImageProvider,
+    digitalHumanImageModel:
+      source.DIGITAL_HUMAN_IMAGE_MODEL ??
+      (digitalHumanImageProvider === "gemini" ? "gemini-3.1-flash-image" : "gpt-image-2"),
+    digitalHumanImageDailyLimit: parsePositiveInt(source.DIGITAL_HUMAN_IMAGE_DAILY_LIMIT, 5),
     nodeEnv: source.NODE_ENV ?? "development",
     vercelGitCommitSha: source.VERCEL_GIT_COMMIT_SHA ?? "",
     npmPackageVersion: source.npm_package_version ?? ""
@@ -78,6 +89,11 @@ export function parseStorageProvider(value?: string): StorageProviderKey {
 
 export function parseLLMProvider(value?: string): LLMProviderKey {
   if (value === "openai" || value === "gemini" || value === "groq" || value === "openrouter") return value;
+  return "mock";
+}
+
+export function parseDigitalHumanImageProvider(value?: string): DigitalHumanImageProviderKey {
+  if (value === "openai" || value === "gemini") return value;
   return "mock";
 }
 

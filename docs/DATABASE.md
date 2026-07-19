@@ -18,6 +18,7 @@ Vercel builds generate Prisma Client through `postinstall`. Do not run
 - `DigitalHuman`: digital-human profile.
 - `Persona`: role, backstory, tone, audience, music style, visual style, and default language/market preferences.
 - `ConsentRecord`: real-person authorization record.
+- `DigitalHumanImageGeneration`: consent-linked portrait generation audit record with source metadata, output file, Provider, model, status, and errors.
 - `SongIdea`: generated song concept with the language/market context used when it was created.
 - `ContentPlan`: scheduled content item, production status, and per-plan language/market overrides.
 - `CreativeEvidence`: one Content Plan creative audit trail from idea to final lyrics, Suno prompt, and publish time.
@@ -42,6 +43,16 @@ Uploading music advances `idea` or `lyrics` to `music_generated`.
 Uploading video advances `idea`, `lyrics`, or `music_generated` to `video_ready`.
 
 ## Asset Metadata
+
+Digital-human image generations store:
+
+- the Digital Human and Consent Record used for authorization
+- source filename, MIME type, byte size, and SHA-256 checksum; source bytes are not retained
+- completed output `FileAsset`
+- Provider, model, style, and identity-preserving prompt
+- processing/completed/failed status, timestamps, and error message
+
+The successful output is written to `DigitalHuman.avatarUrl`. Foreign keys use `RESTRICT` so consent and output evidence cannot be removed while a generation record depends on them.
 
 Music assets are stored as:
 

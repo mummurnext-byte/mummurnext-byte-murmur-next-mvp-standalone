@@ -5,6 +5,7 @@ Standalone AI digital-human music content system.
 This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
+- Create a digital-human avatar from an authorized JPG, PNG, or WebP portrait using Local Preview or the official Gemini/OpenAI image APIs.
 - Generate mock 7-day Content Plans.
 - Prepare manual Suno / MakeBestMusic music prompts.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
@@ -71,6 +72,9 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | `LLM_PROVIDER` | No | `mock` | Smart AI Singer provider: `mock`, `openai`, `gemini`, `groq`, or `openrouter`. |
 | `LLM_MODEL` | No | `gemini-2.5-flash` | Model name for the selected LLM provider. Leave empty to use the provider default. |
 | `OPENAI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openai`. |
+| `DIGITAL_HUMAN_IMAGE_PROVIDER` | No | `mock` | Digital-human image provider: `mock`, `gemini`, or `openai`. Missing matching credentials fall back to Local Preview. When unset, an explicitly configured Gemini LLM and key are reused. |
+| `DIGITAL_HUMAN_IMAGE_MODEL` | No | provider default | Optional image model override. Defaults to `gemini-3.1-flash-image` for Gemini and `gpt-image-2` for OpenAI. |
+| `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` | No | `5` | Maximum image generation attempts per UTC day. Failed provider calls count toward the limit. |
 | `GEMINI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=gemini`. |
 | `GROQ_API_KEY` | No | empty | Required only when `LLM_PROVIDER=groq`. |
 | `OPENROUTER_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openrouter`. |
@@ -94,6 +98,9 @@ production PostgreSQL database is available.
    - `LLM_PROVIDER`
    - `LLM_MODEL`
    - the matching provider key: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`
+   - `DIGITAL_HUMAN_IMAGE_PROVIDER` (`mock`, `gemini`, or `openai`)
+   - `DIGITAL_HUMAN_IMAGE_MODEL`
+   - `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT`
    - `SMART_AI_DAILY_LIMIT`
    - `STORAGE_PROVIDER` (`vercel_blob` for production uploads)
    - `BLOB_READ_WRITE_TOKEN` (required when `STORAGE_PROVIDER=vercel_blob`)
@@ -108,8 +115,9 @@ npx prisma migrate deploy
 
 4. Deploy from GitHub or with Vercel CLI.
 
-Vercel uses `vercel.json` to run `npx prisma migrate deploy && npm run build`,
-so production deployments apply committed Prisma migrations before building.
+Vercel uses `vercel.json` to run `npx prisma migrate deploy` only for Production
+deployments, then builds the app. Preview deployments do not compete for the
+production database migration lock.
 The app also runs `prisma generate` during `postinstall`, and `npm run build`
 runs `prisma generate && next build` so Prisma Client is available in builds.
 
@@ -156,6 +164,31 @@ npm run db:generate
 npm run db:migrate
 npm run db:studio
 ```
+
+## Digital Human Image Workflow
+
+1. Create or open a Digital Human.
+2. Add an active Consent Record for the real person whose portrait will be used.
+3. In **Create Digital Human Image**, upload a JPG, PNG, or WebP portrait up to 10 MB.
+4. Select Studio, Music Artist, Cinematic, or Futuristic style.
+5. Confirm the explicit portrait authorization checkbox and generate.
+6. Review the generated avatar and generation history. A successful result becomes the Digital Human avatar automatically.
+
+Provider behavior:
+
+- `DIGITAL_HUMAN_IMAGE_PROVIDER=mock` creates a deterministic Local Preview and does not send the portrait to an external service.
+- `DIGITAL_HUMAN_IMAGE_PROVIDER=gemini` with `GEMINI_API_KEY` uses the official Gemini Interactions image editing API. If this setting is omitted while `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the image workflow reuses Gemini automatically.
+- `DIGITAL_HUMAN_IMAGE_PROVIDER=openai` with `OPENAI_API_KEY` uses the official OpenAI Image editing API. The authorized portrait is sent to OpenAI only for that image request.
+- Selecting `gemini` or `openai` without its matching API key safely falls back to Local Preview.
+
+Source portrait bytes are not retained after the generation request. The audit record stores only the original filename, MIME type, byte size, and SHA-256 checksum. Only completed output images are stored and viewable. The image workflow does not send portraits to Smart AI Singer or any text LLM, and it never stores cookies or account credentials.
+
+External image generation can take longer than local preview and may incur provider charges. `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` limits attempts per UTC day; the default is `5`. Gemini-generated images include Google's SynthID watermark.
+
+Gemini image generation requires a billing-enabled Gemini API project. Gemini
+image models do not have a free API tier; a free-tier key returns HTTP `429`
+with a quota limit of `0`. Text generation can continue using Gemini's supported
+free-tier text models independently.
 
 ## Manual Music Workflow
 

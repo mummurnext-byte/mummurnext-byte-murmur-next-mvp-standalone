@@ -26,7 +26,16 @@ const copy = {
     generateTikTokCopy: "Generate TikTok Copy",
     generateYouTubeCopy: "Generate YouTube Copy",
     contentLanguageSettings: "Content language settings",
-    saveLanguageSettings: "Save Language Settings"
+    saveLanguageSettings: "Save Language Settings",
+    digitalHumanImageBuilder: "Create Digital Human Image",
+    digitalHumanImageDescription: "Turn an authorized real-person portrait into a digital avatar portrait.",
+    sourcePortrait: "Source portrait (JPG, PNG, or WebP; max 10 MB)",
+    avatarStyle: "Avatar style",
+    portraitConsentConfirmation: "I confirm the portrait owner authorized this digital-human image generation.",
+    generateDigitalHumanImage: "Create Digital Human",
+    generatingDigitalHumanImage: "Creating...",
+    activeConsentRequired: "Add an active Consent Record before creating a digital human image.",
+    imageGenerationHistory: "Image generation history"
   },
   "zh-CN": {
     description: "独立 AI 数字人音乐内容系统。Smart AI Singer 可使用已配置的大模型；音乐、视频和发布平台仍保持手动流程。",
@@ -53,7 +62,16 @@ const copy = {
     generateTikTokCopy: "生成 TikTok 文案",
     generateYouTubeCopy: "生成 YouTube 文案",
     contentLanguageSettings: "内容语言设置",
-    saveLanguageSettings: "保存语言设置"
+    saveLanguageSettings: "保存语言设置",
+    digitalHumanImageBuilder: "制作数字人形象",
+    digitalHumanImageDescription: "将已获得授权的真人照片转换为数字人头像。",
+    sourcePortrait: "真人照片（JPG、PNG 或 WebP，最大 10 MB）",
+    avatarStyle: "数字人风格",
+    portraitConsentConfirmation: "我确认照片本人已授权本次数字人形象制作。",
+    generateDigitalHumanImage: "制作数字人",
+    generatingDigitalHumanImage: "生成中...",
+    activeConsentRequired: "请先添加有效的真人授权记录。",
+    imageGenerationHistory: "形象生成记录"
   },
   th: {
     description: "ระบบหลังบ้าน AI digital human สำหรับเพลงและคอนเทนต์ Smart AI Singer ใช้ LLM ที่ตั้งค่าไว้ได้ ส่วนเพลง วิดีโอ และการเผยแพร่ยังเป็นขั้นตอนแบบ manual",
@@ -80,7 +98,16 @@ const copy = {
     generateTikTokCopy: "สร้างข้อความ TikTok",
     generateYouTubeCopy: "สร้างข้อความ YouTube",
     contentLanguageSettings: "ตั้งค่าภาษาเนื้อหา",
-    saveLanguageSettings: "บันทึกภาษา"
+    saveLanguageSettings: "บันทึกภาษา",
+    digitalHumanImageBuilder: "สร้างภาพ Digital Human",
+    digitalHumanImageDescription: "เปลี่ยนภาพบุคคลจริงที่ได้รับอนุญาตให้เป็นภาพอวตารดิจิทัล",
+    sourcePortrait: "ภาพต้นฉบับ (JPG, PNG หรือ WebP; สูงสุด 10 MB)",
+    avatarStyle: "สไตล์อวตาร",
+    portraitConsentConfirmation: "ฉันยืนยันว่าเจ้าของภาพอนุญาตให้สร้างภาพ Digital Human นี้",
+    generateDigitalHumanImage: "สร้าง Digital Human",
+    generatingDigitalHumanImage: "กำลังสร้าง...",
+    activeConsentRequired: "กรุณาเพิ่ม Consent Record ที่มีผลก่อนสร้างภาพ",
+    imageGenerationHistory: "ประวัติการสร้างภาพ"
   }
 } satisfies Record<UILanguage, Record<string, string>>;
 
