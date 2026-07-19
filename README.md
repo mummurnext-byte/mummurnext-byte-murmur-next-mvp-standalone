@@ -115,8 +115,9 @@ npx prisma migrate deploy
 
 4. Deploy from GitHub or with Vercel CLI.
 
-Vercel uses `vercel.json` to run `npx prisma migrate deploy && npm run build`,
-so production deployments apply committed Prisma migrations before building.
+Vercel uses `vercel.json` to run `npx prisma migrate deploy` only for Production
+deployments, then builds the app. Preview deployments do not compete for the
+production database migration lock.
 The app also runs `prisma generate` during `postinstall`, and `npm run build`
 runs `prisma generate && next build` so Prisma Client is available in builds.
 
