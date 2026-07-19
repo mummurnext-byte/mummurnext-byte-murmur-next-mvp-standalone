@@ -51,6 +51,12 @@ enum SmartAIStatus {
   failed
 }
 
+enum DigitalHumanImageStatus {
+  processing
+  completed
+  failed
+}
+
 model DigitalHuman {
   id             String          @id @default(uuid()) @db.Uuid
   displayName    String          @map("display_name")
@@ -67,6 +73,7 @@ model DigitalHuman {
   contentPlans   ContentPlan[]
   smartSingerProfile SmartSingerProfile?
   smartAIGenerations SmartAIGeneration[]
+  imageGenerations DigitalHumanImageGeneration[]
 
   @@map("digital_humans")
 }
@@ -154,6 +161,7 @@ model ConsentRecord {
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(6)
   digitalHuman   DigitalHuman @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+  imageGenerations DigitalHumanImageGeneration[]
 
   @@index([digitalHumanId])
   @@map("consent_records")
@@ -243,9 +251,39 @@ model FileAsset {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  outputImageGenerations DigitalHumanImageGeneration[] @relation("DigitalHumanOutputImage")
 
   @@index([entityType, entityId])
   @@map("file_assets")
+}
+
+model DigitalHumanImageGeneration {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  digitalHumanId       String                  @map("digital_human_id") @db.Uuid
+  consentRecordId      String                  @map("consent_record_id") @db.Uuid
+  outputFileAssetId    String?                 @map("output_file_asset_id") @db.Uuid
+  sourceOriginalName   String                  @map("source_original_name")
+  sourceMimeType       String                  @map("source_mime_type")
+  sourceByteSize       Int                     @map("source_byte_size")
+  sourceChecksumSha256 String                  @map("source_checksum_sha256")
+  provider             String
+  model                String?
+  style                String
+  prompt               String
+  status               DigitalHumanImageStatus @default(processing)
+  errorMessage         String?                 @map("error_message")
+  startedAt            DateTime                @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt           DateTime?               @map("finished_at") @db.Timestamptz(6)
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime?               @map("deleted_at") @db.Timestamptz(6)
+  digitalHuman         DigitalHuman            @relation(fields: [digitalHumanId], references: [id], onDelete: Restrict)
+  consentRecord        ConsentRecord           @relation(fields: [consentRecordId], references: [id], onDelete: Restrict)
+  outputFileAsset      FileAsset?              @relation("DigitalHumanOutputImage", fields: [outputFileAssetId], references: [id], onDelete: Restrict)
+
+  @@index([digitalHumanId, createdAt])
+  @@index([status])
+  @@map("digital_human_image_generations")
 }
 
 model PublishAsset {

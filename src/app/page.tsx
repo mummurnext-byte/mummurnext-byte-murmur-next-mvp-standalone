@@ -16,6 +16,7 @@ import {
   uploadVideoAssetAction
 } from "@/app/actions";
 import { CopyFields } from "@/components/copy-fields";
+import { DigitalHumanImageBuilder } from "@/components/digital-human-image-builder";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { prisma } from "@/lib/prisma";
 import { getUICopy, type UICopy } from "@/lib/ui-copy";
@@ -25,6 +26,8 @@ import {
   outputLanguageOptions,
   targetMarketOptions
 } from "@/services/global-language";
+import { isActiveConsent } from "@/services/digital-human-image";
+import { createDigitalHumanImageProvider } from "@/services/digital-human-image-provider";
 import { getMusicProvider, musicProviders } from "@/services/music-provider";
 import { getVideoProvider, videoProviders } from "@/services/video-provider";
 
@@ -154,6 +157,11 @@ async function loadSelectedHuman(id: string) {
         where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         take: 5
+      },
+      imageGenerations: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 5
       }
     }
   });
@@ -197,6 +205,9 @@ function SelectedHumanPanel({
   human: NonNullable<Awaited<ReturnType<typeof loadSelectedHuman>>>;
   ui: UICopy;
 }) {
+  const imageProvider = createDigitalHumanImageProvider();
+  const hasActiveConsent = human.consentRecords.some((record) => isActiveConsent(record));
+
   return (
     <Panel title={`Digital Human: ${human.displayName}`}>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -263,6 +274,38 @@ function SelectedHumanPanel({
               </ul>
             )}
           </div>
+
+          <DigitalHumanImageBuilder
+            digitalHumanId={human.id}
+            avatarUrl={human.avatarUrl?.startsWith("/api/digital-human-images/") ? human.avatarUrl : null}
+            hasActiveConsent={hasActiveConsent}
+            provider={{
+              name: imageProvider.providerName,
+              model: imageProvider.model,
+              sendsImageExternally: imageProvider.sendsImageExternally
+            }}
+            generations={human.imageGenerations.map((generation) => ({
+              id: generation.id,
+              status: generation.status,
+              provider: generation.provider,
+              model: generation.model,
+              style: generation.style,
+              createdAt: formatDate(generation.createdAt),
+              errorMessage: generation.errorMessage,
+              outputFileAssetId: generation.outputFileAssetId
+            }))}
+            labels={{
+              title: ui.digitalHumanImageBuilder,
+              description: ui.digitalHumanImageDescription,
+              sourcePhoto: ui.sourcePortrait,
+              style: ui.avatarStyle,
+              consentConfirmation: ui.portraitConsentConfirmation,
+              generate: ui.generateDigitalHumanImage,
+              generating: ui.generatingDigitalHumanImage,
+              activeConsentRequired: ui.activeConsentRequired,
+              generationHistory: ui.imageGenerationHistory
+            }}
+          />
 
           <SmartSingerProfilePanel human={human} />
         </div>

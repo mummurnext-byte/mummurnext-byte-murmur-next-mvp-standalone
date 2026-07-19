@@ -16,18 +16,40 @@ export async function storeUploadedFile(input: {
   }
 
   const buffer = Buffer.from(await input.file.arrayBuffer());
-  const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
-  const storage = await getObjectStorageProvider().storeObject({
+  return storeFileBuffer({
+    buffer,
     fileName: input.file.name,
-    buffer
+    mimeType: input.file.type || "application/octet-stream",
+    entityType: input.entityType,
+    entityId: input.entityId
+  });
+}
+
+export async function storeFileBuffer(input: {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  entityType: string;
+  entityId: string;
+}) {
+  const env = getEnv();
+
+  if (input.buffer.byteLength > env.maxUploadBytes) {
+    throw new Error(`File exceeds maximum size of ${env.maxUploadBytes} bytes.`);
+  }
+
+  const checksumSha256 = createHash("sha256").update(input.buffer).digest("hex");
+  const storage = await getObjectStorageProvider().storeObject({
+    fileName: input.fileName,
+    buffer: input.buffer
   });
 
   return prisma.fileAsset.create({
     data: {
-      originalName: input.file.name,
+      originalName: input.fileName,
       storageKey: storage.storageKey,
-      mimeType: input.file.type || "application/octet-stream",
-      byteSize: input.file.size,
+      mimeType: input.mimeType,
+      byteSize: input.buffer.byteLength,
       checksumSha256,
       entityType: input.entityType,
       entityId: input.entityId
