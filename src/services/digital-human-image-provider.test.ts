@@ -98,6 +98,28 @@ describe("digital human image provider", () => {
     ).rejects.toThrow("Gemini image provider request failed with status 403.");
   });
 
+  it("includes the structured Gemini provider message for actionable API errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: "The selected model does not support image output." } }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+    const provider = new GeminiDigitalHumanImageProvider("test-only-key", "gemini-3.1-flash-image");
+
+    await expect(
+      provider.generate({
+        sourceImage: Buffer.from("portrait"),
+        sourceMimeType: "image/png",
+        sourceFileName: "portrait.png",
+        prompt: "Create a music artist portrait."
+      })
+    ).rejects.toThrow("The selected model does not support image output.");
+  });
+
   it("creates a local preview without an external image call", async () => {
     const provider = new MockDigitalHumanImageProvider();
     const result = await provider.generate({

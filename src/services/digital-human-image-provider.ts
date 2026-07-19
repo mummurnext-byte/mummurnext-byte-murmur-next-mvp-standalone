@@ -71,7 +71,7 @@ export class GeminiDigitalHumanImageProvider implements DigitalHumanImageProvide
     });
 
     if (!response.ok) {
-      throw new Error(`Gemini image provider request failed with status ${response.status}.`);
+      throw new Error(await getGeminiProviderError(response));
     }
 
     const payload = (await response.json()) as Record<string, unknown>;
@@ -111,6 +111,21 @@ function findGeminiOutputImage(payload: Record<string, unknown>): GeminiImageBlo
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+async function getGeminiProviderError(response: Response) {
+  const fallback = `Gemini image provider request failed with status ${response.status}.`;
+
+  try {
+    const payload = (await response.json()) as Record<string, unknown>;
+    const providerError = isRecord(payload.error) ? payload.error : null;
+    const message = providerError && typeof providerError.message === "string" ? providerError.message.trim() : "";
+    if (!message) return fallback;
+
+    return `Gemini image provider request failed with status ${response.status}: ${message.slice(0, 500)}`;
+  } catch {
+    return fallback;
+  }
 }
 
 export class MockDigitalHumanImageProvider implements DigitalHumanImageProvider {
