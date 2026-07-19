@@ -124,7 +124,7 @@ export function DigitalHumanImageBuilder({
         </button>
         <p className="text-xs text-zinc-500">
           {provider.sendsImageExternally
-            ? "The authorized portrait is sent to OpenAI Image only for this generation."
+            ? `The authorized portrait is sent to ${provider.name} only for this generation.`
             : "Local Preview does not send the portrait to an external image service."}
         </p>
         {message ? <p className={`text-sm ${message.ok ? "text-emerald-300" : "text-red-300"}`}>{message.text}</p> : null}

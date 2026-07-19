@@ -44,6 +44,8 @@ Creates a digital-human avatar from an authorized portrait. The request is `mult
 
 The Digital Human must have an active, non-expired Consent Record. The service validates both file extension/MIME and image magic bytes, applies the UTC daily limit, records source metadata and a SHA-256 checksum without retaining the source bytes, and saves the completed output through the configured Storage Provider.
 
+`DIGITAL_HUMAN_IMAGE_PROVIDER` accepts `mock`, `gemini`, or `openai`. A missing matching API key falls back to Local Preview. If the image setting is omitted while `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the service reuses Gemini through its official image editing API.
+
 ### `GET /api/digital-human-images/{fileAssetId}`
 
 Streams only completed digital-human output images. Source portrait bytes are not retained.

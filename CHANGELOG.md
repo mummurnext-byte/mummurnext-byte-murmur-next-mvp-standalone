@@ -18,3 +18,4 @@
 - Added global language and target market controls for UI language, Smart AI output language, input language detection, localized prompts, and generation audit logs.
 - Added Creative Evidence records for Content Plans to track idea, outline, story, mood, character, prompts, Gemini revisions, final lyrics, Suno prompt, and publish time.
 - Added consent-gated digital-human image creation with Local Preview and official OpenAI Image providers, strict portrait validation, non-retained source bytes, output playback, audit history, and a UTC daily limit.
+- Added the official Gemini image editing provider with safe Local Preview fallback and reuse of an explicitly configured Gemini LLM key.

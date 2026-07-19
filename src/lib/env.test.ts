@@ -28,8 +28,23 @@ describe("env", () => {
 
   it("selects supported digital human image providers", () => {
     expect(parseDigitalHumanImageProvider("openai")).toBe("openai");
+    expect(parseDigitalHumanImageProvider("gemini")).toBe("gemini");
     expect(parseDigitalHumanImageProvider("mock")).toBe("mock");
     expect(parseDigitalHumanImageProvider("unknown")).toBe("mock");
+  });
+
+  it("reuses configured Gemini for digital-human images only when the image provider is unset", () => {
+    const automatic = getEnv({ LLM_PROVIDER: "gemini", GEMINI_API_KEY: "test-only-key" });
+    const explicitMock = getEnv({
+      LLM_PROVIDER: "gemini",
+      GEMINI_API_KEY: "test-only-key",
+      DIGITAL_HUMAN_IMAGE_PROVIDER: "mock"
+    });
+
+    expect(automatic.digitalHumanImageProvider).toBe("gemini");
+    expect(automatic.digitalHumanImageModel).toBe("gemini-3.1-flash-image");
+    expect(explicitMock.digitalHumanImageProvider).toBe("mock");
+    expect(explicitMock.digitalHumanImageModel).toBe("gpt-image-2");
   });
 
   it("uses safe defaults without secrets", () => {

@@ -5,7 +5,7 @@ Standalone AI digital-human music content system.
 This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
-- Create a digital-human avatar from an authorized JPG, PNG, or WebP portrait using Local Preview or the official OpenAI Image API.
+- Create a digital-human avatar from an authorized JPG, PNG, or WebP portrait using Local Preview or the official Gemini/OpenAI image APIs.
 - Generate mock 7-day Content Plans.
 - Prepare manual Suno / MakeBestMusic music prompts.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
@@ -72,8 +72,8 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | `LLM_PROVIDER` | No | `mock` | Smart AI Singer provider: `mock`, `openai`, `gemini`, `groq`, or `openrouter`. |
 | `LLM_MODEL` | No | `gemini-2.5-flash` | Model name for the selected LLM provider. Leave empty to use the provider default. |
 | `OPENAI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openai`. |
-| `DIGITAL_HUMAN_IMAGE_PROVIDER` | No | `mock` | Digital-human image provider: `mock` or `openai`. Missing OpenAI credentials fall back to Local Preview. |
-| `DIGITAL_HUMAN_IMAGE_MODEL` | No | `gpt-image-2` | Official OpenAI image editing model used when the image provider is `openai`. |
+| `DIGITAL_HUMAN_IMAGE_PROVIDER` | No | `mock` | Digital-human image provider: `mock`, `gemini`, or `openai`. Missing matching credentials fall back to Local Preview. When unset, an explicitly configured Gemini LLM and key are reused. |
+| `DIGITAL_HUMAN_IMAGE_MODEL` | No | provider default | Optional image model override. Defaults to `gemini-3.1-flash-image` for Gemini and `gpt-image-2` for OpenAI. |
 | `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` | No | `5` | Maximum image generation attempts per UTC day. Failed provider calls count toward the limit. |
 | `GEMINI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=gemini`. |
 | `GROQ_API_KEY` | No | empty | Required only when `LLM_PROVIDER=groq`. |
@@ -98,7 +98,7 @@ production PostgreSQL database is available.
    - `LLM_PROVIDER`
    - `LLM_MODEL`
    - the matching provider key: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`
-   - `DIGITAL_HUMAN_IMAGE_PROVIDER` (`mock` or `openai`)
+   - `DIGITAL_HUMAN_IMAGE_PROVIDER` (`mock`, `gemini`, or `openai`)
    - `DIGITAL_HUMAN_IMAGE_MODEL`
    - `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT`
    - `SMART_AI_DAILY_LIMIT`
@@ -176,12 +176,13 @@ npm run db:studio
 Provider behavior:
 
 - `DIGITAL_HUMAN_IMAGE_PROVIDER=mock` creates a deterministic Local Preview and does not send the portrait to an external service.
+- `DIGITAL_HUMAN_IMAGE_PROVIDER=gemini` with `GEMINI_API_KEY` uses the official Gemini Interactions image editing API. If this setting is omitted while `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the image workflow reuses Gemini automatically.
 - `DIGITAL_HUMAN_IMAGE_PROVIDER=openai` with `OPENAI_API_KEY` uses the official OpenAI Image editing API. The authorized portrait is sent to OpenAI only for that image request.
-- Selecting `openai` without `OPENAI_API_KEY` safely falls back to Local Preview.
+- Selecting `gemini` or `openai` without its matching API key safely falls back to Local Preview.
 
 Source portrait bytes are not retained after the generation request. The audit record stores only the original filename, MIME type, byte size, and SHA-256 checksum. Only completed output images are stored and viewable. The image workflow does not send portraits to Smart AI Singer or any text LLM, and it never stores cookies or account credentials.
 
-OpenAI image generation can take longer than local preview and may incur provider charges. `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` limits attempts per UTC day; the default is `5`.
+External image generation can take longer than local preview and may incur provider charges. `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` limits attempts per UTC day; the default is `5`. Gemini-generated images include Google's SynthID watermark.
 
 ## Manual Music Workflow
 

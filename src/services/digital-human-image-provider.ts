@@ -11,7 +11,7 @@ export type DigitalHumanImageProviderResult = {
 };
 
 export interface DigitalHumanImageProvider {
-  readonly providerKey: "mock" | "openai";
+  readonly providerKey: "mock" | "openai" | "gemini";
   readonly providerName: string;
   readonly model: string;
   readonly sendsImageExternally: boolean;
@@ -21,6 +21,96 @@ export interface DigitalHumanImageProvider {
     sourceFileName: string;
     prompt: string;
   }): Promise<DigitalHumanImageProviderResult>;
+}
+
+type GeminiImageBlock = {
+  data?: unknown;
+  mime_type?: unknown;
+  mimeType?: unknown;
+};
+
+export class GeminiDigitalHumanImageProvider implements DigitalHumanImageProvider {
+  readonly providerKey = "gemini" as const;
+  readonly providerName = "Gemini Image";
+  readonly sendsImageExternally = true;
+
+  constructor(
+    private readonly apiKey: string,
+    readonly model: string
+  ) {}
+
+  async generate(input: {
+    sourceImage: Buffer;
+    sourceMimeType: string;
+    sourceFileName: string;
+    prompt: string;
+  }): Promise<DigitalHumanImageProviderResult> {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": this.apiKey
+      },
+      body: JSON.stringify({
+        model: this.model,
+        input: [
+          { type: "text", text: input.prompt },
+          {
+            type: "image",
+            mime_type: input.sourceMimeType,
+            data: input.sourceImage.toString("base64")
+          }
+        ],
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: "1:1",
+          image_size: "1K"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini image provider request failed with status ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>;
+    const image = findGeminiOutputImage(payload);
+    if (!image || typeof image.data !== "string" || image.data.length === 0) {
+      throw new Error("Gemini image provider returned no generated image.");
+    }
+
+    const mimeType = image.mime_type === "image/jpeg" || image.mimeType === "image/jpeg" ? "image/jpeg" : "image/png";
+    return {
+      buffer: Buffer.from(image.data, "base64"),
+      mimeType,
+      extension: mimeType === "image/jpeg" ? ".jpg" : ".png",
+      provider: this.providerKey,
+      model: this.model
+    };
+  }
+}
+
+function findGeminiOutputImage(payload: Record<string, unknown>): GeminiImageBlock | null {
+  const direct = payload.output_image ?? payload.outputImage;
+  if (isRecord(direct)) return direct;
+
+  const steps = Array.isArray(payload.steps) ? payload.steps : [];
+  for (let stepIndex = steps.length - 1; stepIndex >= 0; stepIndex -= 1) {
+    const step = steps[stepIndex];
+    if (!isRecord(step)) continue;
+    const content = Array.isArray(step.content) ? step.content : [];
+    for (let contentIndex = content.length - 1; contentIndex >= 0; contentIndex -= 1) {
+      const block = content[contentIndex];
+      if (isRecord(block) && block.type === "image") return block;
+    }
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 export class MockDigitalHumanImageProvider implements DigitalHumanImageProvider {
@@ -89,6 +179,9 @@ export class OpenAIDigitalHumanImageProvider implements DigitalHumanImageProvide
 
 export function createDigitalHumanImageProvider(source: EnvSource = process.env): DigitalHumanImageProvider {
   const env = getEnv(source);
+  if (env.digitalHumanImageProvider === "gemini" && env.geminiApiKey) {
+    return new GeminiDigitalHumanImageProvider(env.geminiApiKey, env.digitalHumanImageModel);
+  }
   if (env.digitalHumanImageProvider === "openai" && env.openaiApiKey) {
     return new OpenAIDigitalHumanImageProvider(env.openaiApiKey, env.digitalHumanImageModel);
   }
