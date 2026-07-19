@@ -82,6 +82,8 @@ describe("digital human image provider", () => {
       "https://generativelanguage.googleapis.com/v1beta/interactions",
       expect.objectContaining({ method: "POST" })
     );
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body)).response_format.mime_type).toBe("image/jpeg");
   });
 
   it("returns a clear Gemini provider error without exposing the response body", async () => {
