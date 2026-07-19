@@ -5,6 +5,7 @@ Standalone AI digital-human music content system.
 This repository is intentionally separate from Mummur Back Office. It contains only the Mummur Next MVP workflow:
 
 - Manage Digital Humans, Persona settings, and Consent Records.
+- Create a digital-human avatar from an authorized JPG, PNG, or WebP portrait using Local Preview or the official OpenAI Image API.
 - Generate mock 7-day Content Plans.
 - Prepare manual Suno / MakeBestMusic music prompts.
 - Upload generated music assets: `mp3`, `wav`, `m4a`.
@@ -71,6 +72,9 @@ Copy `.env.example` to `.env` for local development. Do not commit `.env`.
 | `LLM_PROVIDER` | No | `mock` | Smart AI Singer provider: `mock`, `openai`, `gemini`, `groq`, or `openrouter`. |
 | `LLM_MODEL` | No | `gemini-2.5-flash` | Model name for the selected LLM provider. Leave empty to use the provider default. |
 | `OPENAI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openai`. |
+| `DIGITAL_HUMAN_IMAGE_PROVIDER` | No | `mock` | Digital-human image provider: `mock` or `openai`. Missing OpenAI credentials fall back to Local Preview. |
+| `DIGITAL_HUMAN_IMAGE_MODEL` | No | `gpt-image-2` | Official OpenAI image editing model used when the image provider is `openai`. |
+| `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` | No | `5` | Maximum image generation attempts per UTC day. Failed provider calls count toward the limit. |
 | `GEMINI_API_KEY` | No | empty | Required only when `LLM_PROVIDER=gemini`. |
 | `GROQ_API_KEY` | No | empty | Required only when `LLM_PROVIDER=groq`. |
 | `OPENROUTER_API_KEY` | No | empty | Required only when `LLM_PROVIDER=openrouter`. |
@@ -94,6 +98,9 @@ production PostgreSQL database is available.
    - `LLM_PROVIDER`
    - `LLM_MODEL`
    - the matching provider key: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`
+   - `DIGITAL_HUMAN_IMAGE_PROVIDER` (`mock` or `openai`)
+   - `DIGITAL_HUMAN_IMAGE_MODEL`
+   - `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT`
    - `SMART_AI_DAILY_LIMIT`
    - `STORAGE_PROVIDER` (`vercel_blob` for production uploads)
    - `BLOB_READ_WRITE_TOKEN` (required when `STORAGE_PROVIDER=vercel_blob`)
@@ -156,6 +163,25 @@ npm run db:generate
 npm run db:migrate
 npm run db:studio
 ```
+
+## Digital Human Image Workflow
+
+1. Create or open a Digital Human.
+2. Add an active Consent Record for the real person whose portrait will be used.
+3. In **Create Digital Human Image**, upload a JPG, PNG, or WebP portrait up to 10 MB.
+4. Select Studio, Music Artist, Cinematic, or Futuristic style.
+5. Confirm the explicit portrait authorization checkbox and generate.
+6. Review the generated avatar and generation history. A successful result becomes the Digital Human avatar automatically.
+
+Provider behavior:
+
+- `DIGITAL_HUMAN_IMAGE_PROVIDER=mock` creates a deterministic Local Preview and does not send the portrait to an external service.
+- `DIGITAL_HUMAN_IMAGE_PROVIDER=openai` with `OPENAI_API_KEY` uses the official OpenAI Image editing API. The authorized portrait is sent to OpenAI only for that image request.
+- Selecting `openai` without `OPENAI_API_KEY` safely falls back to Local Preview.
+
+Source portrait bytes are not retained after the generation request. The audit record stores only the original filename, MIME type, byte size, and SHA-256 checksum. Only completed output images are stored and viewable. The image workflow does not send portraits to Smart AI Singer or any text LLM, and it never stores cookies or account credentials.
+
+OpenAI image generation can take longer than local preview and may incur provider charges. `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` limits attempts per UTC day; the default is `5`.
 
 ## Manual Music Workflow
 
