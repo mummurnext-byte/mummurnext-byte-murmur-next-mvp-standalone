@@ -185,6 +185,11 @@ Source portrait bytes are not retained after the generation request. The audit r
 
 External image generation can take longer than local preview and may incur provider charges. `DIGITAL_HUMAN_IMAGE_DAILY_LIMIT` limits attempts per UTC day; the default is `5`. Gemini-generated images include Google's SynthID watermark.
 
+Gemini image generation requires a billing-enabled Gemini API project. Gemini
+image models do not have a free API tier; a free-tier key returns HTTP `429`
+with a quota limit of `0`. Text generation can continue using Gemini's supported
+free-tier text models independently.
+
 ## Manual Music Workflow
 
 1. Create a Digital Human with Persona and Consent.

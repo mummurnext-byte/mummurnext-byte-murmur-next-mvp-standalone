@@ -46,6 +46,11 @@ The Digital Human must have an active, non-expired Consent Record. The service v
 
 `DIGITAL_HUMAN_IMAGE_PROVIDER` accepts `mock`, `gemini`, or `openai`. A missing matching API key falls back to Local Preview. If the image setting is omitted while `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the service reuses Gemini through its official image editing API.
 
+The Gemini interaction requests a `1:1`, 1K JPEG result because the current
+Interactions API image response format supports JPEG. Gemini image generation
+requires a billing-enabled API project; quota errors are returned as a safe,
+actionable provider error without logging the API key or source portrait.
+
 ### `GET /api/digital-human-images/{fileAssetId}`
 
 Streams only completed digital-human output images. Source portrait bytes are not retained.

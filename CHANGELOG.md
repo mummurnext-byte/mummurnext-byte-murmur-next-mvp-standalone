@@ -20,3 +20,4 @@
 - Added consent-gated digital-human image creation with Local Preview and official OpenAI Image providers, strict portrait validation, non-retained source bytes, output playback, audit history, and a UTC daily limit.
 - Added the official Gemini image editing provider with safe Local Preview fallback and reuse of an explicitly configured Gemini LLM key.
 - Limited automatic Prisma migration deployment to Vercel Production builds so Preview builds do not compete for the shared database advisory lock.
+- Updated Gemini image output to the supported JPEG response format and surfaced sanitized API quota/model errors for troubleshooting.
